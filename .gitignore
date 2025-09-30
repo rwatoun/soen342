@@ -1,1 +1,13 @@
+# venvs
 .venv/
+venv/
+
+# python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# packaging / builds
+*.egg-info/
+.eggs/
+build/
