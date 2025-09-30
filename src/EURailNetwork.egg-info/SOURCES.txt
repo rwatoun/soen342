@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+src/__init__.py
+src/EURailNetwork.egg-info/PKG-INFO
+src/EURailNetwork.egg-info/SOURCES.txt
+src/EURailNetwork.egg-info/dependency_links.txt
+src/EURailNetwork.egg-info/requires.txt
+src/EURailNetwork.egg-info/top_level.txt
