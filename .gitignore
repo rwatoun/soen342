@@ -8,6 +8,7 @@ __pycache__/
 *.pyo
 
 # packaging / builds
+src/EURailNetwork.egg-info
 *.egg-info/
 .eggs/
 build/
