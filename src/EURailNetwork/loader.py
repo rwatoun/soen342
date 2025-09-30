@@ -4,11 +4,13 @@ from .registries import RailNetwork
 from .utils_time import parse_time_with_offset, duration_minutes_with_offset
 from .schema import parse_days, parse_price_int
 
+# names of our columns after renaming them from the csv
 COLS = [
     "route_id","departure_city","arrival_city","departure_time","arrival_time",
     "train_type","days_of_operation","first_class_eur","second_class_eur"
 ]
 
+# this method loads the csv file as strings, and returns a dataframe with columns COLS
 def read_raw_csv(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig", sep=None, engine="python")
     aliases = {
@@ -23,6 +25,7 @@ def read_raw_csv(path: str) -> pd.DataFrame:
     "first_class_ticket_rate_(in_euro)":"first_class_eur"
     }
     df = df.rename(columns={c: c.strip().lower().replace(" ", "_") for c in df.columns})
+    # if the previous step still doesn't work, it checks against aliases
     for k,v in list(aliases.items()):
         if k in df.columns and v not in df.columns:
             df = df.rename(columns={k:v})
@@ -32,6 +35,9 @@ def read_raw_csv(path: str) -> pd.DataFrame:
     df = df[COLS].apply(lambda s: s.str.strip())
     return df
 
+# this method creates a new instance of the railNetwork class and instantiates the attributes of connection like the 
+# dep_city, arr_city, etc. it then instantiates its own attributes and passes all the data to conn obj
+# it also adds it to the registry of the rail network
 def build_network_from_df(df: pd.DataFrame) -> RailNetwork:
     g = RailNetwork()
     for i, row in df.iterrows():
@@ -41,8 +47,10 @@ def build_network_from_df(df: pd.DataFrame) -> RailNetwork:
 
         dep_t, dep_off = parse_time_with_offset(row["departure_time"])
         arr_t, arr_off = parse_time_with_offset(row["arrival_time"])
-        if dep_off not in (0,):  # usually departure won't carry +Nd; treat as data issue if it does
+
+        if dep_off not in (0,):  
             raise ValueError(f"Row {i}: departure_time has unexpected day offset '(+{dep_off}d)'")
+        
         days  = parse_days(row["days_of_operation"])
         p1    = parse_price_int(row["first_class_eur"])
         p2    = parse_price_int(row["second_class_eur"])

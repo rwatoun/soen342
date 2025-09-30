@@ -5,7 +5,7 @@ from .inspectors import print_summary, print_city, print_train
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("csv_path")
-    p.add_argument("--head", type=int, default=5)
+    p.add_argument("--head", type=int, default=5) # option in flag if you want to show a specific number of rows
     p.add_argument("--summary", action="store_true")
     p.add_argument("--city")
     p.add_argument("--train")
@@ -27,6 +27,8 @@ def main():
         for c in g.connections[:args.head]:
             print(f"{c.route_id}: {c.dep_city.name} {c.dep_time} → {c.arr_city.name} {c.arr_time} ({c.trip_minutes} min) [{c.train.name}]")
 
+# code runs only when module is executed (not when imported)
+# can be invoked with this cli command python "-m EURailNetwork data/eu_rail_network.csv --summary" or variations
 if __name__ == "__main__":
     main()
 

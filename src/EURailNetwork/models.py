@@ -3,7 +3,10 @@ from dataclasses import dataclass, field
 from datetime import time
 from typing import FrozenSet
 
+# because we later map the days of the week to integers for easier tracking 
 Weekday = int  
+
+# default_factory=list means that a new list is create for every new City instance
 
 @dataclass
 class City:
@@ -16,6 +19,9 @@ class Train:
     name: str
     connections: list["Connection"] = field(default_factory=list)
 
+# connection object holds references to the other two objects above
+# frozenset (immutable version of the set object) means that once it's created its 
+# elements can't be modified. in this case, days is an immutable set of weekdays
 @dataclass
 class Connection:
     route_id: str

@@ -3,6 +3,8 @@ from typing import Iterable
 from .models import Connection
 from .registries import RailNetwork
 
+# these are the called methods upon the user's cli commands which fetches the data from all the created classes/registries
+
 def print_summary(net: RailNetwork, top: int = 5) -> None:
     print(f"Cities: {len(net.cities.items)} | Trains: {len(net.trains.items)} | Connections: {len(net.connections)}")
     by_dep = Counter(c.dep_city.name for c in net.connections).most_common(top)
