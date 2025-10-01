@@ -54,3 +54,30 @@ class RailNetwork:
         conn.dep_city.departures.append(conn)
         conn.arr_city.arrivals.append(conn)
         conn.train.connections.append(conn)
+    
+    # this method is called by the test for search and sort to validate that everyhting works well
+    # for the search of items
+    def find_direct(self, depart_city: str, arrival_city: str, weekday: int | None = None):
+        def _norm(s: str): return " ".join(s.strip().split()).casefold()
+        dep_k, arr_k = _norm(depart_city), _norm(arrival_city)
+        return [
+            c for c in self.connections
+            if _norm(c.dep_city.name) == dep_k
+            and _norm(c.arr_city.name) == arr_k
+            and (weekday is None or weekday in c.days)
+        ]
+
+    # this method is called by the test for search and sort to validate that everyhting works well 
+    # for the sorting of the connections
+    @staticmethod
+    def sort_connections(conns, by: str, ascending: bool = True, price_class: str | None = None):
+        if by == "trip_minutes":
+            key = lambda c: (c.trip_minutes, c.dep_time, c.route_id)
+        elif by == "price":
+            key = (lambda c: (c.first_class_eur, c.dep_time, c.route_id)) if price_class == "first" \
+                  else (lambda c: (c.second_class_eur, c.dep_time, c.route_id))
+        elif by == "dep_time":
+            key = lambda c: (c.dep_time, c.route_id)
+        else:
+            raise ValueError(f"Unsupported sort key: {by}")
+        return sorted(conns, key=key, reverse=not ascending)
