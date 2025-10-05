@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Iterable
 from .models import City, Train, Connection
 
-# this function helps normalizing the data by trimming and collapsing spaces
+# this function helps normalize the data by trimming and collapsing spaces
 def norm_name(name: str) -> str:
     return " ".join(name.strip().split()).casefold()
 
@@ -81,3 +81,94 @@ class RailNetwork:
         else:
             raise ValueError(f"Unsupported sort key: {by}")
         return sorted(conns, key=key, reverse=not ascending)
+    
+    def search_cities(self,
+                      name_pattern: str=None,
+                      min_departures: int = None,
+                      min_arrivals: int = None,
+                      sort_by: str = "name"
+                      ) -> list[City]:
+        
+        results = self.cities.items.copy(); # Creating shallow copy of list of all cities
+
+        # Making sure 
+        if name_pattern:
+            pattern = name_pattern.lower(); # Convert search term to lowercase for easier matching
+            results = [city for city in results if pattern in city.name.lower()] # Looking for cities that contain search term as a substring (comparing to all lowercase cities)
+
+        # Filtering by minimum departures
+        if min_departures is not None:
+            results = [city for city in results if len(city.departures) >= min_departures]
+
+        # Filtering by minimum arrivals
+        if min_arrivals is not None:
+            results = [city for city in results if len(city.arrivals) >= min_arrivals]
+        
+        # Sorting
+        if sort_by == "name":
+            results.sort(key=lambda city: city.name)
+        elif sort_by == "departures":
+            results.sort(key=lambda city: city.departures, reverse=True) # Want to sort in descending order so True (same for sort_by arrivals)
+        elif sort_by == "arrivals":
+            results.sort(key=lambda city: city.departures, reverse=True)
+        
+        return results
+    
+    def search_trains(self, name_pattern: str=None, 
+                      min_connections: int=None, 
+                      sort_by: str="name") -> list[Train]:
+        
+        results = self.trains.items.copy(); # Shallow copy of all trains
+        
+        if name_pattern:
+            pattern = name_pattern.lower(); # Convert search term to lowercase for easier matching
+            results = [train for train in results if pattern in train.name.lower()]
+        
+        # If specify this argument, will return trains that have at least x number of connections
+        if min_connections is not None:
+            results = [train for train in results if len(train.connections) >= min_connections]
+
+        # Sorting
+        if sort_by == "name":
+            results.sort(key=lambda train:train.name)
+        if sort_by == "connections":
+            results.sort(key=lambda train:len(train.connections), reverse=True)
+
+        return results
+    
+    def search_ticket_price(self, max_price: int=None, min_price: int=None, price_class: str="second", sort_by: str="price"):
+        results = self.connections.copy();
+
+        # Filtering by price class (first or second-default)
+        if price_class == "first":
+            prices = [city.first_class_eur for city in results]
+        else:
+            prices = [city.second_class_eur for city in results]
+
+        # Price filters
+        if min_price is not None:
+            if price_class == "first": # Still have to check price class
+                results = [city for city in results if city.first_class_eur >= min_price]
+            else:
+                results = [city for city in results if city.second_class_eur >= min_price]
+
+        if max_price is not None:
+            if price_class == "first":
+                results = [city for city in results if city.first_class_eur <= max_price]
+            else:
+                results = [city for city in results if city.second_class_eur <= max_price]
+        
+        # Sorting
+        if sort_by == "price":
+            if price_class == "first":
+                results.sort(key=lambda city: city.first_class_eur)
+            else:
+                results.sort(key=lambda city: city.second_class_eur)
+        elif sort_by == "dep_time":
+            results.sort(key=lambda city: city.dep_time)
+
+        return results
+    
+    
+
+        

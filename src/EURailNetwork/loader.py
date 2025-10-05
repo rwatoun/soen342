@@ -14,7 +14,7 @@ COLS = [
 def read_raw_csv(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig", sep=None, engine="python")
     aliases = {
-        "route_id": "route_id",
+    "route_id": "route_id",
     "departure_city": "departure_city",
     "arrival_city": "arrival_city",
     "departure_time": "departure_time",

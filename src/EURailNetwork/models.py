@@ -7,7 +7,6 @@ from typing import FrozenSet
 Weekday = int  
 
 # default_factory=list means that a new list is create for every new City instance
-
 @dataclass
 class City:
     name: str
