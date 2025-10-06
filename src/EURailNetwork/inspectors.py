@@ -44,3 +44,16 @@ def check_invariants(net: RailNetwork) -> None:
         assert c in c.arr_city.arrivals,   "Connection missing from arr_city.arrivals"
         assert c in c.train.connections,   "Connection missing from train.connections"
     print("invariants OK")
+
+def print_connection_search_results(
+        connections: list[Connection]
+) -> None:
+    
+    # Case where there are connections that can be retrieved and that match the criteria given by the client
+    if not connections:
+        print("No connections found matching the parameters given.")
+        return
+
+    # Display number of connections found matching criteria
+    print(f"\nFound {len(connections)} connections.\n")
+    
