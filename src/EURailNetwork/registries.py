@@ -82,92 +82,83 @@ class RailNetwork:
             raise ValueError(f"Unsupported sort key: {by}")
         return sorted(conns, key=key, reverse=not ascending)
     
-    def search_cities(self,
-                      name_pattern: str=None,
-                      min_departures: int = None,
-                      min_arrivals: int = None,
-                      sort_by: str = "name"
-                      ) -> list[City]:
-        
-        results = self.cities.items.copy(); # Creating shallow copy of list of all cities
-
-        # Making sure 
-        if name_pattern:
-            pattern = name_pattern.lower(); # Convert search term to lowercase for easier matching
-            results = [city for city in results if pattern in city.name.lower()] # Looking for cities that contain search term as a substring (comparing to all lowercase cities)
-
-        # Filtering by minimum departures
-        if min_departures is not None:
-            results = [city for city in results if len(city.departures) >= min_departures]
-
-        # Filtering by minimum arrivals
-        if min_arrivals is not None:
-            results = [city for city in results if len(city.arrivals) >= min_arrivals]
-        
-        # Sorting
-        if sort_by == "name":
-            results.sort(key=lambda city: city.name)
-        elif sort_by == "departures":
-            results.sort(key=lambda city: city.departures, reverse=True) # Want to sort in descending order so True (same for sort_by arrivals)
-        elif sort_by == "arrivals":
-            results.sort(key=lambda city: city.departures, reverse=True)
-        
-        return results
+    def search_connections(
+        self,
+        depart_city: str = None,
+        arrival_city: str = None, 
+        train_type: str = None,
+        min_first_class_price: int = None,
+        max_first_class_price: int = None,
+        min_second_class_price: int = None, 
+        max_second_class_price: int = None,
+        min_departure_time: time = None,
+        max_departure_time: time = None,
+        min_arrival_time: time = None,
+        max_arrival_time: time = None,
+        min_duration: int = None,
+        max_duration: int = None,
+        weekday: int = None,
+        sort_by: str = "dep_time",
+        ascending: bool = True) -> list[Connection]:
     
-    def search_trains(self, name_pattern: str=None, 
-                      min_connections: int=None, 
-                      sort_by: str="name") -> list[Train]:
+        results = self.items.copy(); # Create shallow copy of connections
+
+        # Filter by departure city
+        if depart_city:
+            dep_pattern = norm_name(depart_city) # Normalize city name (all lowercase, no extra white space) - in registries.py
+            # results modified to only contain cities that have the parameter as substring. City names are normalized when compared to depart_city
+            results = [c for c in results if dep_pattern in norm_name(c.dep_city.name)] # c as in connection
+
+        # Filter by arrival city
+        # Exact same logic as depart_city case
+        if arrival_city:
+            arr_pattern = norm_name(arrival_city)
+            results = [c for c in results if arr_pattern in norm_name(c.arrival_city.name)]
         
-        results = self.trains.items.copy(); # Shallow copy of all trains
+        # Filter by train type
+        # Exact same logic as depart_city case
+        if train_type:
+            train_pattern = norm_name(train_pattern)
+            results = [c for c in results if train_pattern in norm_name(c.train_pattern.name)]
+
+        # Filter by first class price
+        # Client can provide 2 first class prices: min and max, and the system will fetch connections between these 2 prices
+        if min_first_class_price is not None:
+            results = [c for c in results if min_first_class_price <= c.first_class_eur]
+        if max_first_class_price is not None:
+            results = [c for c in results if max_first_class_price >= c.first_class_eur]
+
+        # Filter by second class price
+        # Same logic as first_class_price
+        if min_second_class_price is not None:
+            results = [c for c in results if min_second_class_price <= c.second_class_eur]
+        if max_second_class_price is not None:
+            results = [c for c in results if max_second_class_price >= c.second_class_eur]
         
-        if name_pattern:
-            pattern = name_pattern.lower(); # Convert search term to lowercase for easier matching
-            results = [train for train in results if pattern in train.name.lower()]
+        # Filter by departure time
+        # Same logic as first_class_price
+        if min_departure_time is not None:
+            results = [c for c in results if min_departure_time <= c.dep_time]
+        if max_departure_time is not None:
+            results = [c for c in results if max_departure_time >= c.dep_time]    
+
+        # Filter by arrival time
+        # Same logic as first_class_price
+        if min_arrival_time is not None:
+            results = [c for c in results if min_arrival_time <= c.arr_time]
+        if max_arrival_time is not None:
+            results = [c for c in results if max_arrival_time >= c.arr_time]
+
+        # Filter by duration
+        if min_duration is not None:
+            results = [c for c in results if min_duration <= c.trip_minutes]
+        if max_duration is not None:
+            results = [c for c in results if max_duration >= c.trip_minutes]
+
+        if weekday is not None:
+            results = [c for c in results if weekday in c.days]
         
-        # If specify this argument, will return trains that have at least x number of connections
-        if min_connections is not None:
-            results = [train for train in results if len(train.connections) >= min_connections]
-
-        # Sorting
-        if sort_by == "name":
-            results.sort(key=lambda train:train.name)
-        if sort_by == "connections":
-            results.sort(key=lambda train:len(train.connections), reverse=True)
-
-        return results
-    
-    def search_ticket_price(self, max_price: int=None, min_price: int=None, price_class: str="second", sort_by: str="price"):
-        results = self.connections.copy();
-
-        # Filtering by price class (first or second-default)
-        if price_class == "first":
-            prices = [city.first_class_eur for city in results]
-        else:
-            prices = [city.second_class_eur for city in results]
-
-        # Price filters
-        if min_price is not None:
-            if price_class == "first": # Still have to check price class
-                results = [city for city in results if city.first_class_eur >= min_price]
-            else:
-                results = [city for city in results if city.second_class_eur >= min_price]
-
-        if max_price is not None:
-            if price_class == "first":
-                results = [city for city in results if city.first_class_eur <= max_price]
-            else:
-                results = [city for city in results if city.second_class_eur <= max_price]
-        
-        # Sorting
-        if sort_by == "price":
-            if price_class == "first":
-                results.sort(key=lambda city: city.first_class_eur)
-            else:
-                results.sort(key=lambda city: city.second_class_eur)
-        elif sort_by == "dep_time":
-            results.sort(key=lambda city: city.dep_time)
-
-        return results
+        return self.sort_connections(results, by=sort_by, ascending=ascending) # Default sort is by departure time ascending
     
     
 
