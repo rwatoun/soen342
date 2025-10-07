@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Iterable
 from .models import City, Train, Connection
+from datetime import time
 
 # this function helps normalize the data by trimming and collapsing spaces
 def norm_name(name: str) -> str:
@@ -101,7 +102,7 @@ class RailNetwork:
         sort_by: str = "dep_time",
         ascending: bool = True) -> list[Connection]:
     
-        results = self.items.copy(); # Create shallow copy of connections
+        results = self.connections.copy(); # Create shallow copy of connections
 
         # Filter by departure city
         if depart_city:
@@ -113,13 +114,13 @@ class RailNetwork:
         # Exact same logic as depart_city case
         if arrival_city:
             arr_pattern = norm_name(arrival_city)
-            results = [c for c in results if arr_pattern in norm_name(c.arrival_city.name)]
+            results = [c for c in results if arr_pattern in norm_name(c.arr_city.name)]
         
         # Filter by train type
         # Exact same logic as depart_city case
         if train_type:
-            train_pattern = norm_name(train_pattern)
-            results = [c for c in results if train_pattern in norm_name(c.train_pattern.name)]
+            train_pattern = norm_name(train_type)
+            results = [c for c in results if train_pattern in norm_name(c.train.name)]
 
         # Filter by first class price
         # Client can provide 2 first class prices: min and max, and the system will fetch connections between these 2 prices
@@ -158,7 +159,27 @@ class RailNetwork:
         if weekday is not None:
             results = [c for c in results if weekday in c.days]
         
-        return self.sort_connections(results, by=sort_by, ascending=ascending) # Default sort is by departure time ascending
+        if sort_by == "dep_city":
+            key = lambda c: (c.dep_city.name.lower(), c.dep_time, c.route_id)
+        elif sort_by == "arr_city":
+            key = lambda c: (c.arr_city.name.lower(), c.dep_time, c.route_id)
+        elif sort_by == "train_name":
+            key = lambda c: (c.train.name.lower(), c.dep_time, c.route_id)
+        elif sort_by == "first_class_eur":
+            key = lambda c: (c.first_class_eur, c.dep_time, c.route_id)
+        elif sort_by == "second_class_eur":
+            key = lambda c: (c.second_class_eur, c.dep_time, c.route_id)
+        elif sort_by == "dep_time":
+            key = lambda c: (c.dep_time, c.arr_time, c.route_id)
+        elif sort_by == "arr_time":
+            key = lambda c: (c.arr_time, c.dep_time, c.route_id)
+        elif sort_by == "trip_minutes":
+            key = lambda c: (c.trip_minutes, c.dep_time, c.route_id)
+        else:
+            # Default
+            key = lambda c: (c.dep_time, c.route_id)
+    
+        return sorted(results, key=key, reverse=not ascending)
     
     
 

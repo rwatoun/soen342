@@ -45,15 +45,39 @@ def check_invariants(net: RailNetwork) -> None:
         assert c in c.train.connections,   "Connection missing from train.connections"
     print("invariants OK")
 
-def print_connection_search_results(
-        connections: list[Connection]
-) -> None:
+def print_connection_search_results(connections: list[Connection],
+                                    sort_by: str = None,
+                                    ascending: bool = True) -> None:
     
-    # Case where there are connections that can be retrieved and that match the criteria given by the client
+    # Case where there are no connections that can be retrieved and that match the criteria given by the client
     if not connections:
         print("No connections found matching the parameters given.")
         return
 
-    # Display number of connections found matching criteria
-    print(f"\nFound {len(connections)} connections.\n")
+    # Sorting information
+    order_str = "ascending" if ascending else "descending"
+    sort_info = f" (sorted by {sort_by} {order_str})" if sort_by else ""
+
+    # Displaying number of connections found matching criteria
+    print(f"\nFound {len(connections)} connections{sort_info}.\n")
     
+    # Displaying matched connections
+    for i, c in enumerate(connections, 1):
+        # Converting days set to readable format
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        operating_days = ", ".join(day_names[day] for day in sorted(c.days))
+        
+        # Convert duration to readable format - X h Y m
+        duration_str = f"{c.trip_minutes//60}h{c.trip_minutes%60:02d}m"
+        
+        print(f"CONNECTION #{i}")
+        print(f"  From:          {c.dep_city.name}")
+        print(f"  To:            {c.arr_city.name}") 
+        print(f"  Departure:     {c.dep_time.strftime('%H:%M')}")
+        print(f"  Arrival:       {c.arr_time.strftime('%H:%M')}")
+        print(f"  Duration:      {duration_str} ({c.trip_minutes} minutes)")
+        print(f"  Train:         {c.train.name}")
+        print(f"  Operating:     {operating_days}")
+        print(f"  1st Class:     {c.first_class_eur}€")
+        print(f"  2nd Class:     {c.second_class_eur}€")
+
