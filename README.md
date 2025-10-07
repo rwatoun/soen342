@@ -15,3 +15,5 @@ After cloning repository:
 1. python -m venv .venv  
 2. pip install -e .  
 3. python -m EURailNetwork data/eu_rail_network.csv --summary
+
+For running tests: pytest -v
