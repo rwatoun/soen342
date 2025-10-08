@@ -6,8 +6,8 @@ import pytest
 from EURailNetwork.loader import read_raw_csv, build_network_from_df
 from EURailNetwork.registries import RailNetwork  
 
-# this method creates a small csv that has connections which cover most cases
-# it also returns the path to that temporary csv file
+# This method creates a small csv that has connections which cover most cases
+# It also returns the path to that temporary csv file
 def _make_csv(tmp_path: Path) -> str:
     csv = textwrap.dedent("""\
         Route ID,Departure City,Arrival City,Departure Time,Arrival Time,Train Type,Days of Operation,First Class ticket rate (in euro),Second Class ticket rate (in euro)
@@ -56,7 +56,7 @@ def test_find_direct_no_match_returns_empty(net: RailNetwork):
     assert net.find_direct("Berlin", "Paris") == []
 
 
-# SORTING TESTS
+# Sorting tests
 
 def test_sort_by_duration_ascending(net: RailNetwork):
     paris_lyon = net.find_direct("Paris", "Lyon")
@@ -81,7 +81,7 @@ def test_sort_by_first_class_price_descending(net: RailNetwork):
     ordered = net.sort_connections(paris_lyon, by="price", ascending=False, price_class="first")
     assert [c.route_id for c in ordered] == ["R006", "R001", "R002", "R003"]
 
-# this method outlines how we break ties when we sort (based on departure time and route id)
+# This method outlines how we break ties when we sort (based on departure time and route id)
 def test_sort_ties_break_by_dep_time_then_route_id(net: RailNetwork):
     paris_lyon = net.find_direct("Paris", "Lyon")
     ordered = net.sort_connections(paris_lyon, by="trip_minutes", ascending=True)
