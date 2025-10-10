@@ -7,3 +7,20 @@
 | Justyne Phan   | @JustynePhan | 40278509   |
 | Elif Sag Sesen | @elif5446    | 40283343   |
 
+Must have Python installed.
+Depending on your Python version, you might have to replace the python command with python3.
+
+After cloning the repository:
+
+python -m venv .venv
+pip install -e .
+
+To run the program:
+
+python -m EURailNetwork data/eu_rail_network.csv
+
+This will launch the interactive menu where you can view the network summary, search for connections, view city information, or view train details.
+
+To run tests:
+
+pytest -v
