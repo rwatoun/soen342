@@ -81,3 +81,42 @@ def print_connection_search_results(connections: list[Connection],
         print(f"  1st Class:     {c.first_class_eur}€")
         print(f"  2nd Class:     {c.second_class_eur}€")
 
+def print_indirect_connection_results(routes: list[dict]):
+    """Display multi-leg routes with total and waiting times."""
+    if not routes:
+        print("No indirect routes found.")
+        return
+
+    print(f"\nFound {len(routes)} indirect route(s):\n")
+    for i, r in enumerate(routes, 1):
+        segs = " → ".join(seg.dep_city.name for seg in r["segments"]) \
+               + f" → {r['segments'][-1].arr_city.name}"
+        hours, mins = divmod(r["total_minutes"], 60)
+        print(f"ROUTE #{i}: {segs}")
+        print(f"  Total Duration: {hours}h{mins:02d}m "
+              f"(includes {r['wait_minutes']} min waiting)")
+        print("  Segments:")
+        for s in r["segments"]:
+            print(f"    {s.dep_city.name} {s.dep_time.strftime('%H:%M')} → "
+                  f"{s.arr_city.name} {s.arr_time.strftime('%H:%M')} "
+                  f"[{s.train.name}] ({s.trip_minutes} min)")
+        print()
+        
+def print_indirect_connection_results(routes):
+    if not routes:
+        print("No indirect routes found.")
+        return
+
+    print(f"\nFound {len(routes)} indirect route(s):\n")
+    for idx, route in enumerate(routes, start=1):
+        segs = route["segments"]
+        total = route["total_minutes"]
+        print(f"ROUTE #{idx}: {segs[0].dep_city.name} → {segs[-1].arr_city.name}")
+        print(f"  Total Duration: {total // 60}h{total % 60:02d}m")
+        print("  Segments:")
+        for i, seg in enumerate(segs):
+            print(f"    {seg.dep_city.name} {seg.dep_time.strftime('%H:%M')} → {seg.arr_city.name} {seg.arr_time.strftime('%H:%M')} [{seg.train.name}] ({seg.trip_minutes} min)")
+            if i < len(segs) - 1:
+                print(f"    Time to change connection in {seg.arr_city.name}: {route['wait_times'][i]} minutes")
+        print()
+

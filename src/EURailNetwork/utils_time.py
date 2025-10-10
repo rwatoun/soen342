@@ -38,3 +38,39 @@ def duration_minutes_with_offset(dep: time, arr: time, arr_day_offset: int = 0) 
     if diff <= 0:
         diff += 24*60
     return diff
+
+
+def calculate_wait_time(arrival: time, next_departure: time) -> int:
+    """Return waiting time in minutes between two trains (handles next-day cases)."""
+    arrival_minutes = arrival.hour * 60 + arrival.minute
+    next_minutes = next_departure.hour * 60 + next_departure.minute
+    diff = next_minutes - arrival_minutes
+    if diff < 0:
+        diff += 24 * 60
+    return diff
+
+def calculate_wait_time(arrival: time, next_departure: time) -> int:
+    """
+    Return waiting time between arrival and next departure (in minutes).
+    Handles next-day departures automatically.
+    """
+    arr = arrival.hour * 60 + arrival.minute
+    dep = next_departure.hour * 60 + next_departure.minute
+    diff = dep - arr
+    if diff < 0:
+        diff += 24 * 60
+    return diff
+from datetime import datetime, timedelta, time
+
+def calculate_wait_time(arrival: time, next_departure: time) -> int:
+    """
+    Calculate waiting time in minutes between two train connections.
+    Supports next-day departures (e.g. arrival 23:00, next departure 05:00).
+    """
+    arr_minutes = arrival.hour * 60 + arrival.minute
+    dep_minutes = next_departure.hour * 60 + next_departure.minute
+    wait = dep_minutes - arr_minutes
+    if wait < 0:
+        wait += 24 * 60  
+        # handle overnight connection
+    return wait

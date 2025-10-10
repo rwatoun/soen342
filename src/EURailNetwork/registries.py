@@ -1,11 +1,18 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Dict, Iterable
+from typing import Dict
 from .models import City, Train, Connection
 from datetime import time
+import unicodedata
+
 
 # this function helps normalize the data by trimming and collapsing spaces
 def norm_name(name: str) -> str:
+    """Normalize a name for reliable matching (case-insensitive, no accents or extra spaces)."""
+    if not name:
+        return ""
+    name = unicodedata.normalize("NFKD", name)
+    name = "".join(c for c in name if not unicodedata.combining(c))
     return " ".join(name.strip().split()).casefold()
 
 # class cities holds a list and a dictionnary of cities from which it can fetch specific ones or create ones based on names
@@ -76,7 +83,7 @@ class RailNetwork:
             key = lambda c: (c.trip_minutes, c.dep_time, c.route_id)
         elif by == "price":
             key = (lambda c: (c.first_class_eur, c.dep_time, c.route_id)) if price_class == "first" \
-                  else (lambda c: (c.second_class_eur, c.dep_time, c.route_id))
+                else (lambda c: (c.second_class_eur, c.dep_time, c.route_id))
         elif by == "dep_time":
             key = lambda c: (c.dep_time, c.route_id)
         else:
@@ -86,11 +93,11 @@ class RailNetwork:
     def search_connections(
         self,
         depart_city: str = None,
-        arrival_city: str = None, 
+        arrival_city: str = None,
         train_type: str = None,
         min_first_class_price: int = None,
         max_first_class_price: int = None,
-        min_second_class_price: int = None, 
+        min_second_class_price: int = None,
         max_second_class_price: int = None,
         min_departure_time: time = None,
         max_departure_time: time = None,
@@ -100,65 +107,57 @@ class RailNetwork:
         max_duration: int = None,
         weekday: int = None,
         sort_by: str = "dep_time",
-        ascending: bool = True) -> list[Connection]:
-    
-        results = self.connections.copy(); # Create shallow copy of connections
+        ascending: bool = True
+    ) -> list[Connection]:
+
+        results = self.connections.copy()
 
         # Filter by departure city
         if depart_city:
-            dep_pattern = norm_name(depart_city) # Normalize city name (all lowercase, no extra white space) - in registries.py
-            # results modified to only contain cities that have the parameter as substring. City names are normalized when compared to depart_city
-            results = [c for c in results if dep_pattern in norm_name(c.dep_city.name)] # c as in connection
-
-        # Filter by arrival city
-        # Exact same logic as depart_city case
+            dep_pattern = norm_name(depart_city)
+            results = [c for c in results if dep_pattern in norm_name(c.dep_city.name)]
         if arrival_city:
             arr_pattern = norm_name(arrival_city)
             results = [c for c in results if arr_pattern in norm_name(c.arr_city.name)]
-        
+
         # Filter by train type
         # Exact same logic as depart_city case
         if train_type:
-            train_pattern = norm_name(train_type)
-            results = [c for c in results if train_pattern in norm_name(c.train.name)]
+            t_pattern = norm_name(train_type)
+            results = [c for c in results if t_pattern in norm_name(c.train.name)]
 
         # Filter by first class price
         # Client can provide 2 first class prices: min and max, and the system will fetch connections between these 2 prices
         if min_first_class_price is not None:
             results = [c for c in results if min_first_class_price <= c.first_class_eur]
         if max_first_class_price is not None:
-            results = [c for c in results if max_first_class_price >= c.first_class_eur]
-
-        # Filter by second class price
-        # Same logic as first_class_price
+            results = [c for c in results if c.first_class_eur <= max_first_class_price]
         if min_second_class_price is not None:
             results = [c for c in results if min_second_class_price <= c.second_class_eur]
         if max_second_class_price is not None:
-            results = [c for c in results if max_second_class_price >= c.second_class_eur]
-        
-        # Filter by departure time
-        # Same logic as first_class_price
+            results = [c for c in results if c.second_class_eur <= max_second_class_price]
+
+        # Time filters
         if min_departure_time is not None:
             results = [c for c in results if min_departure_time <= c.dep_time]
         if max_departure_time is not None:
-            results = [c for c in results if max_departure_time >= c.dep_time]    
-
-        # Filter by arrival time
-        # Same logic as first_class_price
+            results = [c for c in results if c.dep_time <= max_departure_time]
         if min_arrival_time is not None:
             results = [c for c in results if min_arrival_time <= c.arr_time]
         if max_arrival_time is not None:
-            results = [c for c in results if max_arrival_time >= c.arr_time]
+            results = [c for c in results if c.arr_time <= max_arrival_time]
 
-        # Filter by duration
+        # Duration filters
         if min_duration is not None:
             results = [c for c in results if min_duration <= c.trip_minutes]
         if max_duration is not None:
-            results = [c for c in results if max_duration >= c.trip_minutes]
+            results = [c for c in results if c.trip_minutes <= max_duration]
 
+        # Weekday filter
         if weekday is not None:
             results = [c for c in results if weekday in c.days]
-        
+
+        # Sorting
         if sort_by == "dep_city":
             key = lambda c: (c.dep_city.name.lower(), c.dep_time, c.route_id)
         elif sort_by == "arr_city":
@@ -176,11 +175,75 @@ class RailNetwork:
         elif sort_by == "trip_minutes":
             key = lambda c: (c.trip_minutes, c.dep_time, c.route_id)
         else:
-            # Default
             key = lambda c: (c.dep_time, c.route_id)
-    
-        return sorted(results, key=key, reverse=not ascending)
-    
-    
 
+        return sorted(results, key=key, reverse=not ascending)
+
+    # --- Indirect Connections (1-stop and 2-stop) ---
+    def find_indirect_connections(self, from_city: str, to_city: str, max_stops: int = 2):
+        """
+        Find all possible 1-stop and 2-stop routes between two cities.
+        Includes waiting times and supports next-day departures.
+        """
+        from .utils_time import calculate_wait_time
+        results = []
+
+        from_key = norm_name(from_city)
+        to_key = norm_name(to_city)
         
+        adj = {}
+        for c in self.connections:
+            dep = norm_name(c.dep_city.name)
+            adj.setdefault(dep, []).append(c)
+
+        # --- 1-STOP (A → B → C) ---
+        if from_key in adj:
+            for c1 in adj[from_key]:
+                mid_key = norm_name(c1.arr_city.name)
+                if mid_key not in adj:
+                    continue
+                for c2 in adj[mid_key]:
+                    if norm_name(c2.arr_city.name) == to_key:
+                        wait = calculate_wait_time(c1.arr_time, c2.dep_time)
+                        total = c1.trip_minutes + c2.trip_minutes + wait
+                        results.append({
+                            "segments": [c1, c2],
+                            "wait_times": [wait],
+                            "total_minutes": total,
+                        })
+
+        # --- 2-STOP (A → B → C → D) ---
+        if max_stops >= 2 and from_key in adj:
+            for c1 in adj[from_key]:
+                mid1_key = norm_name(c1.arr_city.name)
+                if mid1_key not in adj:
+                    continue
+                for c2 in adj[mid1_key]:
+                    mid2_key = norm_name(c2.arr_city.name)
+                    if mid2_key not in adj:
+                        continue
+                    for c3 in adj[mid2_key]:
+                        if norm_name(c3.arr_city.name) == to_key:
+                            wait1 = calculate_wait_time(c1.arr_time, c2.dep_time)
+                            wait2 = calculate_wait_time(c2.arr_time, c3.dep_time)
+                            total = (
+                                c1.trip_minutes + c2.trip_minutes + c3.trip_minutes
+                                + wait1 + wait2
+                            )
+                            results.append({
+                                "segments": [c1, c2, c3],
+                                "wait_times": [wait1, wait2],
+                                "total_minutes": total,
+                            })
+
+        # --- Deduplicate routes ---
+        unique = []
+        seen = set()
+        for r in results:
+            key = tuple(seg.route_id for seg in r["segments"])
+            if key not in seen:
+                unique.append(r)
+                seen.add(key)
+
+        #print(f"DEBUG: Found {len(unique)} indirect route(s) from {from_city} → {to_city}")
+        return unique

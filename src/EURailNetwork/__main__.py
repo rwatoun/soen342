@@ -1,35 +1,41 @@
 import argparse
 from .loader import read_raw_csv, build_network_from_df
-from .inspectors import print_summary, print_city, print_train, print_connection_search_results
+from .inspectors import (
+    print_summary,
+    print_city,
+    print_train,
+    print_connection_search_results,
+)
+from .utils_time import parse_time
+
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("csv_path")
+
     # Option in flag if you want to show a specific number of rows
-    p.add_argument("--head", type=int, default=5) # To show all possible connections, specify --head 1200
+    p.add_argument("--head", type=int, default=5, help="Number of connections to preview")
+
+    # Top-level actions
     p.add_argument("--summary", action="store_true")
     p.add_argument("--city")
     p.add_argument("--train")
-    #args = p.parse_args()
-    #args = p.parse_args()
-
-    #df = read_raw_csv(args.csv_path)
-    #g = build_network_from_df(df)
 
     # Connection search arguments
-    p.add_argument("--search-connections", action="store_true", help="Search for connections using any parameters")
-    
+    p.add_argument("--search-connections", action="store_true",
+                   help="Search for connections using any parameters")
+
     # City search filters
     p.add_argument("--from", dest="from_city", help="Departure city")
     p.add_argument("--to", dest="to_city", help="Arrival city")
 
     # Train type search filters
     p.add_argument("--train-type", help="Train type (substring match)")
-    
+
     # First class price filters
     p.add_argument("--min-first-price", type=int, help="Minimum first class price")
     p.add_argument("--max-first-price", type=int, help="Maximum first class price")
-    
+
     # Second class price filters
     p.add_argument("--min-second-price", type=int, help="Minimum second class price")
     p.add_argument("--max-second-price", type=int, help="Maximum second class price")
@@ -45,39 +51,41 @@ def main():
     # Duration filters
     p.add_argument("--min-duration", type=int, help="Minimum trip duration (minutes)")
     p.add_argument("--max-duration", type=int, help="Maximum trip duration (minutes)")
-    
+
     # Day of the week filter
-    p.add_argument("--weekday", type=int, choices=range(7), 
-                  help="Weekday (0=Monday, 6=Sunday)")
-    
-    # Sorting by any parameter
-    p.add_argument("--sort-by", 
-        choices=["dep_time", "arr_time", "trip_minutes", "first_class_eur", "second_class_eur", "dep_city", "arr_city", "train_name"],
-        default="dep_time", 
-        help="Sort results by: dep_time, arr_time, trip_minutes, first_class_eur, second_class_eur, dep_city, arr_city, train_name")
-    
-    # Choose order of sorting (ascending or descending)
+    p.add_argument("--weekday", type=int, choices=range(7),
+                   help="Weekday (0=Monday, 6=Sunday)")
+
+    # Sorting
+    p.add_argument(
+        "--sort-by",
+        choices=[
+            "dep_time", "arr_time", "trip_minutes", "first_class_eur",
+            "second_class_eur", "dep_city", "arr_city", "train_name",
+        ],
+        default="dep_time",
+        help="Sort results by one of the available parameters",
+    )
     p.add_argument("--order", choices=["asc", "desc"], default="asc",
-                  help="Sort order: asc (ascending) or desc (descending)")
-    
+                   help="Sort order: asc (ascending) or desc (descending)")
+
+    # Parse arguments
     args = p.parse_args()
 
+    # Build network from CSV
     df = read_raw_csv(args.csv_path)
     g = build_network_from_df(df)
 
+    # === CONNECTION SEARCH MODE ===
     if args.search_connections:
-        # Parse time strings
-        from .utils_time import parse_time
-        
         dep_start = parse_time(args.dep_time_start) if args.dep_time_start else None
         dep_end = parse_time(args.dep_time_end) if args.dep_time_end else None
         arr_start = parse_time(args.arr_time_start) if args.arr_time_start else None
         arr_end = parse_time(args.arr_time_end) if args.arr_time_end else None
-        
-        # Convert sorting order to boolean
+
         ascending = (args.order == "asc")
-        
-        # Perform connection search
+
+        # Perform connection search (direct)
         connections = g.search_connections(
             depart_city=args.from_city,
             arrival_city=args.to_city,
@@ -94,10 +102,33 @@ def main():
             max_duration=args.max_duration,
             weekday=args.weekday,
             sort_by=args.sort_by,
-            ascending=ascending
+            ascending=ascending,
         )
 
-        print_connection_search_results(connections, args.sort_by, ascending)
+        if connections:
+            print_connection_search_results(connections, args.sort_by, ascending)
+        else:
+            print("No direct connections found — searching for indirect routes...\n")
+            routes = g.find_indirect_connections(args.from_city, args.to_city)
+
+            if not routes or len(routes) == 0:
+                print("No indirect routes found.")
+            else:
+                routes.sort(key=lambda r: r["total_minutes"])
+
+                print(f"Found {len(routes)} indirect route(s):\n")
+                for i, route in enumerate(routes, 1):
+                    total_h, total_m = divmod(route["total_minutes"], 60)
+                    print(f"ROUTE #{i}:")
+                    print(f"  Total Duration: {total_h}h{total_m:02d}m")
+
+                    for idx, seg in enumerate(route["segments"]):
+                        print(f"    {seg.dep_city.name:>10} {seg.dep_time.strftime('%H:%M')} → "
+                              f"{seg.arr_city.name:<15} {seg.arr_time.strftime('%H:%M')} "
+                              f"[{seg.train.name}] ({seg.trip_minutes} min)")
+                        if idx < len(route['wait_times']):
+                            print(f"      Time to change connection: {route['wait_times'][idx]} min")
+                    print()
 
     elif args.summary:
         print_summary(g, top=args.head)
@@ -107,12 +138,15 @@ def main():
         print_train(g, args.train, limit=args.head)
     else:
         # Default preview of first N connections
-        print(f"Parsed {len(g.connections)} connections, {len(g.cities.items)} cities, {len(g.trains.items)} trains\n")
+        print(f"Parsed {len(g.connections)} connections, "
+              f"{len(g.cities.items)} cities, {len(g.trains.items)} trains\n")
         for c in g.connections[:args.head]:
-            print(f"{c.route_id}: {c.dep_city.name} {c.dep_time} → {c.arr_city.name} {c.arr_time} ({c.trip_minutes} min) [{c.train.name}]")
+            print(f"{c.route_id}: {c.dep_city.name} {c.dep_time} → "
+                  f"{c.arr_city.name} {c.arr_time} "
+                  f"({c.trip_minutes} min) [{c.train.name}]")
+
 
 # Code runs only when module is executed (not when imported)
 # Can be invoked with this cli command python "-m EURailNetwork data/eu_rail_network.csv --summary" or variations
 if __name__ == "__main__":
     main()
-
