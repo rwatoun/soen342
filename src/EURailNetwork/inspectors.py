@@ -2,6 +2,10 @@ from collections import Counter
 from typing import Iterable
 from .models import Connection
 from .registries import RailNetwork
+from .registries import norm_name
+from colorama import Fore, Style
+from .registries import norm_name
+
 
 # these are the called methods upon the user's cli commands which fetches the data from all the created classes/registries
 
@@ -14,23 +18,61 @@ def print_summary(net: RailNetwork, top: int = 5) -> None:
     print("Top arrival cities:   ", by_arr)
     print("Top trains:           ", by_train)
 
-def print_city(net: RailNetwork, name: str, limit: int = 10) -> None:
-    city = next((c for c in net.cities.items if c.name == name), None)
-    if not city: 
-        print(f"City '{name}' not found"); return
-    print(f"{city.name}: {len(city.departures)} departures, {len(city.arrivals)} arrivals")
-    for c in city.departures[:limit]:
-        print(f"  DEP {c.route_id}: {c.dep_time} → {c.arr_city.name} ({c.trip_minutes} min) [{c.train.name}]")
-    for c in city.arrivals[:limit]:
-        print(f"  ARR {c.route_id}: {c.arr_city.name} ← {c.dep_city.name} {c.arr_time} [{c.train.name}]")
+def print_city(g, city_name, limit=10):
+    """Display information about a city (case-insensitive)."""
+    normalized_target = norm_name(city_name)
+    found_city = None
 
-def print_train(net: RailNetwork, name: str, limit: int = 10) -> None:
-    train = next((t for t in net.trains.items if t.name == name), None)
-    if not train:
-        print(f"Train '{name}' not found"); return
-    print(f"{train.name}: {len(train.connections)} connections")
-    for c in train.connections[:limit]:
-        print(f"  {c.route_id}: {c.dep_city.name} {c.dep_time} → {c.arr_city.name} {c.arr_time} ({c.trip_minutes} min)")
+    # match normalized name
+    for c in g.cities.items:
+        if norm_name(c.name) == normalized_target:
+            found_city = c
+            break
+
+    if not found_city:
+        print(Fore.RED + f"City '{city_name}' not found" + Style.RESET_ALL)
+        return
+
+    print(Fore.CYAN + f"\nCity: {found_city.name}" + Style.RESET_ALL)
+    print(Fore.LIGHTBLACK_EX + "----------------------------------" + Style.RESET_ALL)
+    print(Fore.GREEN + f"Departures ({len(found_city.departures)}):" + Style.RESET_ALL)
+
+    for conn in found_city.departures[:limit]:
+        print(f"  {conn.dep_time.strftime('%H:%M')} → {conn.arr_city.name:<15} [{conn.train.name}] "
+              f"({conn.trip_minutes} min) — {conn.second_class_eur}€ 2nd | {conn.first_class_eur}€ 1st")
+
+    print(Fore.GREEN + f"\nArrivals ({len(found_city.arrivals)}):" + Style.RESET_ALL)
+    for conn in found_city.arrivals[:limit]:
+        print(f"  {conn.arr_time.strftime('%H:%M')} ← {conn.dep_city.name:<15} [{conn.train.name}] "
+              f"({conn.trip_minutes} min) — {conn.second_class_eur}€ 2nd | {conn.first_class_eur}€ 1st")
+
+    print()
+
+def print_train(g, train_name, limit=10):
+    """Display information about a train (case-insensitive)."""
+    normalized_target = norm_name(train_name)
+    found_train = None
+
+    # Find train regardless of case or accents
+    for t in g.trains.items:
+        if norm_name(t.name) == normalized_target:
+            found_train = t
+            break
+
+    if not found_train:
+        print(Fore.RED + f"Train '{train_name}' not found" + Style.RESET_ALL)
+        return
+
+    print(Fore.CYAN + f"\nTrain: {found_train.name}" + Style.RESET_ALL)
+    print(Fore.LIGHTBLACK_EX + "----------------------------------" + Style.RESET_ALL)
+
+    for conn in found_train.connections[:limit]:
+        print(f"{conn.dep_city.name:<15} {conn.dep_time.strftime('%H:%M')} → "
+              f"{conn.arr_city.name:<15} {conn.arr_time.strftime('%H:%M')} "
+              f"({conn.trip_minutes} min) — {conn.second_class_eur}€ 2nd | {conn.first_class_eur}€ 1st")
+
+    print()
+
 
 def check_invariants(net: RailNetwork) -> None:
     """Assert the graph is wired correctly."""
@@ -48,38 +90,45 @@ def check_invariants(net: RailNetwork) -> None:
 def print_connection_search_results(connections: list[Connection],
                                     sort_by: str = None,
                                     ascending: bool = True) -> None:
-    
-    # Case where there are no connections that can be retrieved and that match the criteria given by the client
+    """Print formatted search results, showing sorting info and price/duration/time clearly."""
+
     if not connections:
         print("No connections found matching the parameters given.")
         return
 
-    # Sorting information
+    # Sorting info
     order_str = "ascending" if ascending else "descending"
-    sort_info = f" (sorted by {sort_by} {order_str})" if sort_by else ""
+    sort_label = sort_by.replace("_", " ").title() if sort_by else "unspecified"
+    print(f"\nFound {len(connections)} connections (sorted by {sort_label} {order_str}).\n")
 
-    # Displaying number of connections found matching criteria
-    print(f"\nFound {len(connections)} connections{sort_info}.\n")
-    
-    # Displaying matched connections
     for i, c in enumerate(connections, 1):
-        # Converting days set to readable format
-        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        operating_days = ", ".join(day_names[day] for day in sorted(c.days))
         
-        # Convert duration to readable format - X h Y m
-        duration_str = f"{c.trip_minutes//60}h{c.trip_minutes%60:02d}m"
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        operating_days = ", ".join(day_names[d] for d in sorted(c.days))
+
+        
+        duration_str = f"{c.trip_minutes // 60}h{c.trip_minutes % 60:02d}m"
+
         
         print(f"CONNECTION #{i}")
         print(f"  From:          {c.dep_city.name}")
-        print(f"  To:            {c.arr_city.name}") 
+        print(f"  To:            {c.arr_city.name}")
         print(f"  Departure:     {c.dep_time.strftime('%H:%M')}")
         print(f"  Arrival:       {c.arr_time.strftime('%H:%M')}")
         print(f"  Duration:      {duration_str} ({c.trip_minutes} minutes)")
         print(f"  Train:         {c.train.name}")
         print(f"  Operating:     {operating_days}")
-        print(f"  1st Class:     {c.first_class_eur}€")
-        print(f"  2nd Class:     {c.second_class_eur}€")
+        print(f"  1st Class:     {c.first_class_eur:>3}€")
+        print(f"  2nd Class:     {c.second_class_eur:>3}€")
+
+        if sort_by in ["first_class_eur", "second_class_eur"]:
+            print(f"  → Sorted by:   {sort_label} ({'lowest' if ascending else 'highest'} first)")
+        elif sort_by in ["dep_time", "arr_time"]:
+            print(f"  → Sorted by:   {sort_label} ({'earliest' if ascending else 'latest'} first)")
+        elif sort_by == "trip_minutes":
+            print(f"  → Sorted by:   Duration ({'shortest' if ascending else 'longest'} first)")
+        print()
+
 
 def print_indirect_connection_results(routes: list[dict]):
     """Display multi-leg routes with total and waiting times."""
