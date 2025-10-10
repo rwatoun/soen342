@@ -1,22 +1,38 @@
 from collections import Counter
 from typing import Iterable
 from .models import Connection
-from .registries import RailNetwork
-from .registries import norm_name
+from .registries import RailNetwork, norm_name
 from colorama import Fore, Style
-from .registries import norm_name
 
 
 # these are the called methods upon the user's cli commands which fetches the data from all the created classes/registries
+def print_summary(net: RailNetwork, top: int = 1200) -> None:
+    print(Fore.MAGENTA + "\n=== NETWORK SUMMARY ===" + Style.RESET_ALL)
+    print(Fore.LIGHTBLACK_EX +
+          f"Cities: {len(net.cities.items)} | "
+          f"Trains: {len(net.trains.items)} | "
+          f"Connections: {len(net.connections)}"
+          + Style.RESET_ALL)
 
-def print_summary(net: RailNetwork, top: int = 5) -> None:
-    print(f"Cities: {len(net.cities.items)} | Trains: {len(net.trains.items)} | Connections: {len(net.connections)}")
-    by_dep = Counter(c.dep_city.name for c in net.connections).most_common(top)
-    by_arr = Counter(c.arr_city.name for c in net.connections).most_common(top)
-    by_train = Counter(c.train.name for c in net.connections).most_common(top)
-    print("\nTop departure cities:", by_dep)
-    print("Top arrival cities:   ", by_arr)
-    print("Top trains:           ", by_train)
+    # Departure cities
+    dep_counts = Counter(c.dep_city.name for c in net.connections)
+    print(Fore.CYAN + "\nDEPARTURE CITIES" + Style.RESET_ALL)
+    print(Fore.WHITE + f"Total: {len(dep_counts)} cities\n" + Style.RESET_ALL)
+    print(", ".join(f"{Fore.YELLOW}{city}{Style.RESET_ALL} ({count})" for city, count in dep_counts.most_common()))
+
+    # Arrival cities
+    arr_counts = Counter(c.arr_city.name for c in net.connections)
+    print(Fore.CYAN + "\nARRIVAL CITIES" + Style.RESET_ALL)
+    print(Fore.WHITE + f"Total: {len(arr_counts)} cities\n" + Style.RESET_ALL)
+    print(", ".join(f"{Fore.YELLOW}{city}{Style.RESET_ALL} ({count})" for city, count in arr_counts.most_common()))
+
+    # Trains
+    train_counts = Counter(c.train.name for c in net.connections)
+    print(Fore.CYAN + "\nTRAINS" + Style.RESET_ALL)
+    print(Fore.WHITE + f"Total: {len(train_counts)} train types\n" + Style.RESET_ALL)
+    print(", ".join(f"{Fore.YELLOW}{name}{Style.RESET_ALL} ({count})" for name, count in train_counts.most_common()))
+
+    print(Fore.LIGHTBLACK_EX + "\n---------------------------------------------\n" + Style.RESET_ALL)
 
 def print_city(g, city_name, limit=10):
     """Display information about a city (case-insensitive)."""
@@ -53,7 +69,7 @@ def print_train(g, train_name, limit=10):
     normalized_target = norm_name(train_name)
     found_train = None
 
-    # Find train regardless of case or accents
+    # Find train
     for t in g.trains.items:
         if norm_name(t.name) == normalized_target:
             found_train = t
@@ -90,8 +106,7 @@ def check_invariants(net: RailNetwork) -> None:
 def print_connection_search_results(connections: list[Connection],
                                     sort_by: str = None,
                                     ascending: bool = True) -> None:
-    """Print formatted search results, showing sorting info and price/duration/time clearly."""
-
+    """Print formatted search results."""
     if not connections:
         print("No connections found matching the parameters given.")
         return
@@ -102,14 +117,10 @@ def print_connection_search_results(connections: list[Connection],
     print(f"\nFound {len(connections)} connections (sorted by {sort_label} {order_str}).\n")
 
     for i, c in enumerate(connections, 1):
-        
         day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         operating_days = ", ".join(day_names[d] for d in sorted(c.days))
-
-        
         duration_str = f"{c.trip_minutes // 60}h{c.trip_minutes % 60:02d}m"
 
-        
         print(f"CONNECTION #{i}")
         print(f"  From:          {c.dep_city.name}")
         print(f"  To:            {c.arr_city.name}")
@@ -118,8 +129,8 @@ def print_connection_search_results(connections: list[Connection],
         print(f"  Duration:      {duration_str} ({c.trip_minutes} minutes)")
         print(f"  Train:         {c.train.name}")
         print(f"  Operating:     {operating_days}")
-        print(f"  1st Class:     {c.first_class_eur:>3}€")
-        print(f"  2nd Class:     {c.second_class_eur:>3}€")
+        print(f"  1st Class:     {c.first_class_eur}€")
+        print(f"  2nd Class:     {c.second_class_eur}€")
 
         if sort_by in ["first_class_eur", "second_class_eur"]:
             print(f"  → Sorted by:   {sort_label} ({'lowest' if ascending else 'highest'} first)")
@@ -137,26 +148,6 @@ def print_indirect_connection_results(routes: list[dict]):
         return
 
     print(f"\nFound {len(routes)} indirect route(s):\n")
-    for i, r in enumerate(routes, 1):
-        segs = " → ".join(seg.dep_city.name for seg in r["segments"]) \
-               + f" → {r['segments'][-1].arr_city.name}"
-        hours, mins = divmod(r["total_minutes"], 60)
-        print(f"ROUTE #{i}: {segs}")
-        print(f"  Total Duration: {hours}h{mins:02d}m "
-              f"(includes {r['wait_minutes']} min waiting)")
-        print("  Segments:")
-        for s in r["segments"]:
-            print(f"    {s.dep_city.name} {s.dep_time.strftime('%H:%M')} → "
-                  f"{s.arr_city.name} {s.arr_time.strftime('%H:%M')} "
-                  f"[{s.train.name}] ({s.trip_minutes} min)")
-        print()
-        
-def print_indirect_connection_results(routes):
-    if not routes:
-        print("No indirect routes found.")
-        return
-
-    print(f"\nFound {len(routes)} indirect route(s):\n")
     for idx, route in enumerate(routes, start=1):
         segs = route["segments"]
         total = route["total_minutes"]
@@ -164,8 +155,8 @@ def print_indirect_connection_results(routes):
         print(f"  Total Duration: {total // 60}h{total % 60:02d}m")
         print("  Segments:")
         for i, seg in enumerate(segs):
-            print(f"    {seg.dep_city.name} {seg.dep_time.strftime('%H:%M')} → {seg.arr_city.name} {seg.arr_time.strftime('%H:%M')} [{seg.train.name}] ({seg.trip_minutes} min)")
+            print(f"    {seg.dep_city.name} {seg.dep_time.strftime('%H:%M')} → "
+                  f"{seg.arr_city.name} {seg.arr_time.strftime('%H:%M')} [{seg.train.name}] ({seg.trip_minutes} min)")
             if i < len(segs) - 1:
                 print(f"    Time to change connection in {seg.arr_city.name}: {route['wait_times'][i]} minutes")
         print()
-
