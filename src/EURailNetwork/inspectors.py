@@ -35,18 +35,18 @@ def print_summary(net: RailNetwork, top: int = 1200) -> None:
     print(Fore.LIGHTBLACK_EX + "\n---------------------------------------------\n" + Style.RESET_ALL)
 
 def print_city(g, city_name, limit=10):
-    """Display information about a city (case-insensitive)."""
+    """Display information about a city (case-insensitive, supports substrings)."""
     normalized_target = norm_name(city_name)
     found_city = None
 
-    # match normalized name
+    
     for c in g.cities.items:
-        if norm_name(c.name) == normalized_target:
+        if normalized_target in norm_name(c.name):
             found_city = c
             break
 
     if not found_city:
-        print(Fore.RED + f"City '{city_name}' not found" + Style.RESET_ALL)
+        print(Fore.RED + f"No city found matching '{city_name}'" + Style.RESET_ALL)
         return
 
     print(Fore.CYAN + f"\nCity: {found_city.name}" + Style.RESET_ALL)
@@ -64,19 +64,20 @@ def print_city(g, city_name, limit=10):
 
     print()
 
+
 def print_train(g, train_name, limit=10):
-    """Display information about a train (case-insensitive)."""
+    """Display information about a train (case-insensitive, supports partial match)."""
     normalized_target = norm_name(train_name)
     found_train = None
 
-    # Find train
+    # Match by substring (partial)
     for t in g.trains.items:
-        if norm_name(t.name) == normalized_target:
+        if normalized_target in norm_name(t.name):
             found_train = t
             break
 
     if not found_train:
-        print(Fore.RED + f"Train '{train_name}' not found" + Style.RESET_ALL)
+        print(Fore.RED + f"No train found matching '{train_name}'" + Style.RESET_ALL)
         return
 
     print(Fore.CYAN + f"\nTrain: {found_train.name}" + Style.RESET_ALL)
