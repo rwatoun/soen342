@@ -9,11 +9,13 @@
 
 Must have Python installed.
 Depending on your Python version, you might have to replace the python command with python3.
+colorama library (for colored CLI output)
 
 After cloning the repository:
 
 python -m venv .venv
 pip install -e .
+pip install colorama
 
 To run the program:
 
