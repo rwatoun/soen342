@@ -1,0 +1,16 @@
+# venvs
+.venv/
+venv/
+
+# python cache
+__pycache__/
+*.py[cod]
+*.pyo
+EURailNetwork/__pycache__/
+tests/__pycache__/
+
+# packaging / builds
+src/EURailNetwork.egg-info
+*.egg-info/
+.eggs/
+build/
