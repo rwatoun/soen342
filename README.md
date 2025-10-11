@@ -7,6 +7,7 @@
 | Justyne Phan   | @JustynePhan | 40278509   |
 | Elif Sag Sesen | @elif5446    | 40283343   |
 
+step1
 Must have Python installed.
 Depending on your Python version, you might have to replace the python command with python3.
 colorama library (for colored CLI output)
@@ -26,3 +27,4 @@ This will launch the interactive menu where you can view the network summary, se
 To run tests:
 
 pytest -v
+
