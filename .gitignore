@@ -14,3 +14,5 @@ src/EURailNetwork.egg-info
 *.egg-info/
 .eggs/
 build/
+
+src/.DS_Store
