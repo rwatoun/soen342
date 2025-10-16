@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict
-from .models import City, Train, Connection
+from .models import City, Train, Connection, Traveller, Trip, Reservation, Ticket
 from datetime import time
 import unicodedata
+from typing import Dict, List, Optional
 
 
 # this function helps normalize the data by trimming and collapsing spaces
@@ -247,3 +248,72 @@ class RailNetwork:
 
         #print(f"DEBUG: Found {len(unique)} indirect route(s) from {from_city} → {to_city}")
         return unique
+
+# helper method for normalizing the name input
+def norm_name(name: str) -> str:
+    return name.strip().lower()
+
+@dataclass
+class Travellers:
+    items: list[Traveller] = field(default_factory=list)
+
+    def get_or_create(self, first_name: str, last_name: str, age: int, id: str) -> Traveller:
+        found = self.by_key.get(id)
+        if found:
+            return found
+        traveller = Traveller(first_name=first_name, last_name=last_name, age=age, id=id)
+        self.by_key[id] = traveller
+        self.items.append(traveller)
+        return traveller
+    
+    def find_by_id(self, id_: str) -> Optional[Traveller]:
+        for t in self.items:
+            if t.id == id_:
+                return t
+        return None
+
+@dataclass
+class Trips:
+    by_id: dict[str, Trip] = field(default_factory=dict)
+    items: list[Trip] = field(default_factory=list)
+
+    def create_full_trip(
+        self,
+        connection: Connection,
+        travellers: List[Traveller],
+        reservations_registry: Reservations
+    ) -> Trip:
+
+        # Create the trip (auto id)
+        trip = Trip(connection=connection)
+
+        # Register trip
+        self.by_id[trip.id] = trip
+        self.items.append(trip)
+
+        # Initialize reservations 
+        for traveller in travellers:
+            ticket = Ticket()
+            reservation = Reservation(traveller=traveller, ticket=ticket, trip=trip)
+            ticket.reservation = reservation
+
+            # link all sides
+            trip.reservations.append(reservation)
+            traveller.add_reservation(reservation)
+            reservations_registry.add(reservation)
+
+        # Return the fully constructed trip object
+        return trip
+
+@dataclass
+class Reservations:
+    items: list[Reservation] = field(default_factory=list)
+
+    def add(self, reservation: Reservation):
+        self.items.append(reservation)
+
+    def find_by_traveller(self, traveller: Traveller) -> list[Reservation]:
+        return [r for r in self.items if r.traveller is traveller]
+
+    def find_by_trip(self, trip: Trip) -> list[Reservation]:
+        return [r for r in self.items if r.trip is trip]
