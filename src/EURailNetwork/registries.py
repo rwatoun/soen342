@@ -272,6 +272,10 @@ class Travellers:
                 return t
         return None
 
+    def find_by_last_name(self, last_name:str) -> list[Traveller]:
+        pattern = norm_name(last_name)
+        return [traveller for traveller in self.items if pattern in norm_name(traveller.last_name)]
+        
 @dataclass
 class Trips:
     by_id: dict[str, Trip] = field(default_factory=dict)
@@ -302,8 +306,31 @@ class Trips:
             traveller.add_reservation(reservation)
             reservations_registry.add(reservation)
 
+        self.by_id[trip.id] = id
+        self.items.append(trip)
+
         # Return the fully constructed trip object
         return trip
+    
+    def find_trips_by_traveller_id(self, traveller_id: str) -> list[Trip]:
+        trips = [] # If there aren't any trips, return an empty list (but shouldn't happen because for a traveller to register, needs to book a trip)
+        
+        for trip in self.items:
+            for reservation in trip.reservations:
+                if reservation.traveller.id == traveller_id:
+                    trips.append(trip)
+                    break
+
+        return trips
+    
+    def find_trips_by_traveller_last_name(self, last_name:str) -> list[Trip]:
+        trips = []
+
+        for trip in self.items:
+            for reservation in trip.reservations:
+                if reservation.traveller.last_name == last_name:
+                    trips.append(trip)
+                    break
 
 @dataclass
 class Reservations:
