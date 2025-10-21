@@ -44,8 +44,13 @@ def generate_trip_id() -> str:
 @dataclass
 class Trip:
     id: str = field(default_factory=generate_trip_id)
-    reservations: list["Reservation"]   = field(default_factory=list)
-    connections: list["Connection"]   = field(default_factory=list)
+    reservations: list["Reservation"] = field(default_factory=list)
+    connections: list["Connection"] = field(default_factory=list)
+
+    # Adding reservation
+    def add_reservation(self, reservation: "Reservation") -> None:
+        if reservation not in self.reservations: 
+            self.reservations.append(reservation)
 
 @dataclass
 class Traveller:
