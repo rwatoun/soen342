@@ -113,14 +113,16 @@ def main():
     print(Fore.LIGHTBLACK_EX + "----------------------------------------------\n" + Style.RESET_ALL)
 
     while True:
-        print(Fore.CYAN + "MAIN MENU" + Style.RESET_ALL)
+        print(Fore.CYAN + "=== MAIN MENU ===" + Style.RESET_ALL)
         print(Fore.GREEN + "1." + Style.RESET_ALL, "View Network Summary")
         print(Fore.GREEN + "2." + Style.RESET_ALL, "Search for a Connection")
         print(Fore.GREEN + "3." + Style.RESET_ALL, "View City Info")
         print(Fore.GREEN + "4." + Style.RESET_ALL, "View Train Info")
-        print(Fore.RED + "5." + Style.RESET_ALL, "Exit")
+        print(Fore.GREEN + "5." + Style.RESET_ALL, "Book a Trip")
+        print(Fore.GREEN + "6." + Style.RESET_ALL, "View My Trips")
+        print(Fore.RED + "7." + Style.RESET_ALL, "Exit")
 
-        choice = input(Fore.YELLOW + "\nEnter your choice (1-5): " + Style.RESET_ALL).strip()
+        choice = input(Fore.YELLOW + "\nEnter your choice (1-7): " + Style.RESET_ALL).strip()
 
         # --- Option 1: Summary ---
         if choice == "1":
@@ -303,13 +305,21 @@ def main():
             train = input(Fore.CYAN + "Enter train name: " + Style.RESET_ALL).strip().lower()
             print_train(g, train, limit=args.head)
 
-        # --- Option 5: Exit ---
+        # --- Option 5: Book a Trip ---
         elif choice == "5":
+
+        
+        # --- Option 6: View My Trips ---
+        elif choice == "6":
+
+        
+        # --- Option 7: Exit ---
+        elif choice == "7":
             print(Fore.LIGHTRED_EX + "\nExiting the program. Goodbye.\n" + Style.RESET_ALL)
             break
 
         else:
-            print(Fore.RED + "Invalid choice. Please enter a number between 1 and 5.\n" + Style.RESET_ALL)
+            print(Fore.RED + "Invalid choice. Please enter a number between 1 and 7.\n" + Style.RESET_ALL)
 
 
 # Code runs only when module is executed (not when imported)
