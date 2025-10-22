@@ -351,11 +351,16 @@ class Reservations:
     
 @dataclass
 class BookingSystem:
+# Manages data (bookings, travellers, and trips)
+# Controls booking process
+# Provides view trips given traveller info
+
     railNetwork: RailNetwork
     travellers: Travellers = field(default_factory=Travellers)
     trips: Trips = field(default_factory=Trips)
 
-    def bookTrip(self, connection: Connection, traveller_data: list[dict]) -> Trip:
+    def bookTrip(self, connection: Connection, traveller_data: list[dict]) -> Trip: # Also creates trip object
+        # Connection selected need to exist to be booked and to create a trip
         if connection not in self.railNetwork.connections:
             raise ValueError("Connection not found in rail network") # If there are no connections, stop here and raise error
         
@@ -368,3 +373,18 @@ class BookingSystem:
                 age=data["age"],
                 id=data["id"]
             )
+        travellers.append(traveller)
+
+        trip = self.trips.create_trip(connection, travellers)
+        return trip
+    
+    def view_trips_given_traveller(self, traveller_last_name: str, traveller_id: str = None) -> list[Trip]:
+        if traveller_id:
+            return self.trips.find_trips_by_traveller_id(traveller_id)
+        else:
+            return self.trips.find_trips_by_traveller_last_name(traveller_last_name)
+    
+
+
+
+
