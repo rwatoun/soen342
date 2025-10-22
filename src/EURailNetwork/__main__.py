@@ -48,7 +48,7 @@ def collect_traveller_info() -> list[dict]:
         return travellers
 
     def book_trip_flow(x, booking_system):
-        print(fore.MAGENTA + "\n=== Book A Trip ===" + Style.RESET_ALL)
+        print(Fore.MAGENTA + "\n=== Book A Trip ===" + Style.RESET_ALL)
 
         # 1 Search for a connection
         print(Fore.YELLOW + "Find your connection" + Style.RESET_ALL)
