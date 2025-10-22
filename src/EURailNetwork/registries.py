@@ -260,21 +260,25 @@ class Travellers:
     def get_or_create(self, first_name: str, last_name: str, age: int, id: str) -> Traveller:
         found = self.by_key.get(id)
         if found:
-            return found
+            return found # If traveller exists, return it. stops here
+        # If traveller doesn't exist, create an instance
         traveller = Traveller(first_name=first_name, last_name=last_name, age=age, id=id)
         self.by_key[id] = traveller
         self.items.append(traveller)
-        return traveller
+        return traveller # Return newly created traveller
     
     def find_by_id(self, id_: str) -> Optional[Traveller]:
-        for t in self.items:
-            if t.id == id_:
-                return t
-        return None
+        for traveller in self.items:
+            if traveller.id == id_:
+                return traveller
+        return None # If can't find traveller from id (doesn't exist), return None
 
+    # Same as find_by_id but for last name lookup
     def find_by_last_name(self, last_name:str) -> list[Traveller]:
-        pattern = norm_name(last_name)
-        return [traveller for traveller in self.items if pattern in norm_name(traveller.last_name)]
+        for traveller in self.items:
+            if traveller.last_name == last_name:
+                return traveller
+        return None
         
 @dataclass
 class Trips:
@@ -344,3 +348,23 @@ class Reservations:
 
     def find_by_trip(self, trip: Trip) -> list[Reservation]:
         return [r for r in self.items if r.trip is trip]
+    
+@dataclass
+class BookingSystem:
+    railNetwork: RailNetwork
+    travellers: Travellers = field(default_factory=Travellers)
+    trips: Trips = field(default_factory=Trips)
+
+    def bookTrip(self, connection: Connection, traveller_data: list[dict]) -> Trip:
+        if connection not in self.railNetwork.connections:
+            raise ValueError("Connection not found in rail network") # If there are no connections, stop here and raise error
+        
+        travellers = []
+        for data in traveller_data:
+            # Creates/Gets traveller for every traveller data provided
+            traveller = self.travellers.get_or_create(
+                first_name=data["first_name"],
+                last_name=data["last_name"],
+                age=data["age"],
+                id=data["id"]
+            )
