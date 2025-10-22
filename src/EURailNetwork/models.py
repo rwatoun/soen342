@@ -75,17 +75,23 @@ class Reservation:
 
     # Debugging method
     def summary(self) -> str:
+        if not self.trip.reservations:
+            route = "No route"
+        else:
+            connection = self.trip.connections[0]
+            route = f"{connection.dep_city.name} → {connection.arr_city.name}"
+        
         return (
             f"Reservation for {self.traveller.first_name} {self.traveller.last_name} "
-            f"on trip {self.trip.id} ({self.trip.connection.origin.name} → "
-            f"{self.trip.connection.destination.name}), ticket #{self.ticket.id}"
-        )
+            f"on trip {self.trip.id} ({route}) - ticket #: {self.ticket.id}"
+         )
 
 @dataclass
 class Ticket:
+    reservation: Reservation
     _id_counter: int = 0  # this is a class variable that is not part of instances so the ticket id increments every time
     id: int = field(init=False)
-    reservation: Reservation
+
     def __post_init__(self):
         type(self)._id_counter += 1
         self.id = type(self)._id_counter

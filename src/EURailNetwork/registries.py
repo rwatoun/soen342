@@ -255,6 +255,8 @@ def norm_name(name: str) -> str:
 
 @dataclass
 class Travellers:
+    by_key:Dict[str, Traveller] = field(default_factory=dict)
+    
     items: list[Traveller] = field(default_factory=list)
 
     def get_or_create(self, first_name: str, last_name: str, age: int, id: str) -> Traveller:
@@ -294,23 +296,19 @@ class Trips:
 
         # Create the trip (auto id)
         trip = Trip(connection=connection)
+        trip.connections.append(connection)
 
         # Register trip
-        self.by_id[trip.id] = trip
-        self.items.append(trip)
-
-        # Initialize reservations 
         for traveller in travellers:
-            ticket = Ticket()
+            ticket = Ticket(reservation=None) # Just a placeholder
             reservation = Reservation(traveller=traveller, ticket=ticket, trip=trip)
             ticket.reservation = reservation
 
-            # link all sides
-            trip.reservations.append(reservation)
+            trip.add_reservation(reservation)
             traveller.add_reservation(reservation)
             reservations_registry.add(reservation)
 
-        self.by_id[trip.id] = id
+        self.by_id[trip.id] = trip
         self.items.append(trip)
 
         # Return the fully constructed trip object
@@ -335,6 +333,7 @@ class Trips:
                 if reservation.traveller.last_name == last_name:
                     trips.append(trip)
                     break
+        return trips
 
 @dataclass
 class Reservations:
@@ -359,7 +358,7 @@ class BookingSystem:
     travellers: Travellers = field(default_factory=Travellers)
     trips: Trips = field(default_factory=Trips)
 
-    def bookTrip(self, connection: Connection, traveller_data: list[dict]) -> Trip: # Also creates trip object
+    def book_trip(self, connection: Connection, traveller_data: list[dict]) -> Trip: # Also creates trip object
         # Connection selected need to exist to be booked and to create a trip
         if connection not in self.railNetwork.connections:
             raise ValueError("Connection not found in rail network") # If there are no connections, stop here and raise error
@@ -373,7 +372,7 @@ class BookingSystem:
                 age=data["age"],
                 id=data["id"]
             )
-        travellers.append(traveller)
+            travellers.append(traveller) # Add each traveller to list
 
         trip = self.trips.create_trip(connection, travellers)
         return trip
