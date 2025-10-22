@@ -79,16 +79,16 @@ def book_trip_flow(g, booking_system):
 
     # 4.1  Book trip
     try:
-        trip = booking_system.book_trip(selected_connection)
+        trip = booking_system.book_trip(selected_connection, travellers_data)
 
         # 4.2 Display booking confirmation
         print(Fore.GREEN + "\n=== Booking Confirmation ===" + Style.RESET_ALL)
 
         # 4.3 Display Trip info
         print(f"Trip ID: {trip.id}")
-        print(f"Route: {trip.connections[0].dep_city.namee} → {trip.connections[0].arr_city.name}")
-        print(f"Departure time: {trip.connection.dep_time.strftime('%H:%M')}")
-        print(f"Arrival time: {trip.connection.arr_time.strftime('%H:%M')}")
+        print(f"Route: {trip.connections[0].dep_city.name} → {trip.connections[0].arr_city.name}")
+        print(f"Departure time: {trip.connections[0].dep_time.strftime('%H:%M')}")
+        print(f"Arrival time: {trip.connections[0].arr_time.strftime('%H:%M')}")
         print(f"Number of reservations/travellers: {len(trip.reservations)}")
 
         # 4.4 Print tickets
@@ -96,6 +96,7 @@ def book_trip_flow(g, booking_system):
         for reservation in trip.reservations:
             print(f"{reservation.traveller.first_name} {reservation.traveller.last_name} {reservation.traveller.age} - Ticket #{reservation.ticket.id}")
 
+        print("\nThank you for booking with EURail Network Interactive CLI.\n")
     except Exception as e:
         print(Fore.RED + f"Booking failed due to: {e}" + Style.RESET_ALL)
         return
@@ -319,7 +320,7 @@ def main():
 
         # --- Option 6: View My Trips ---
         elif choice == "6":
-            view_trips_flow(g.booking_system)
+            view_trips_flow(booking_system)
         
         # --- Option 7: Exit ---
         elif choice == "7":

@@ -273,15 +273,14 @@ class Travellers:
         for traveller in self.items:
             if traveller.id == id_:
                 return traveller
-        return None # If can't find traveller from id (doesn't exist), return None
+       # return None # If can't find traveller from id (doesn't exist), return None
 
     # Same as find_by_id but for last name lookup
     def find_by_last_name(self, last_name:str) -> list[Traveller]:
         for traveller in self.items:
             if traveller.last_name == last_name:
                 return traveller
-        return None
-        
+        # return None
 @dataclass
 class Trips:
     by_id: dict[str, Trip] = field(default_factory=dict)
@@ -374,7 +373,22 @@ class BookingSystem:
             )
             travellers.append(traveller) # Add each traveller to list
 
-        trip = self.trips.create_trip(connection, travellers)
+        trip = Trip()
+        trip.connections.append(connection)
+
+        for traveller in travellers:
+            ticket = Ticket(reservation=None)
+            reservation = Reservation(
+                traveller=traveller,
+                ticket=ticket,
+                trip=trip
+            )
+            ticket.reservation = reservation
+            trip.add_reservation(reservation)
+            traveller.add_reservation(reservation)
+
+        self.trips.items.append(trip)
+        self.trips.by_id[trip.id] = trip
         return trip
     
     def view_trips_given_traveller(self, traveller_last_name: str, traveller_id: str = None) -> list[Trip]:
