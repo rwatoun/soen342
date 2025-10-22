@@ -72,12 +72,30 @@ def collect_traveller_info() -> list[dict]:
             return
         
         # 3 Collect traveller info
+        travellers_data = collect_traveller_info()
 
-        # 4  Book trip
+        # 4.1  Book trip
+        try:
+            trip = booking_system.book_trip(selected_connection)
 
-        # 5 Display confirmation
+            # 4.2 Display booking confirmation
+            print(Fore.GREEN + "\n=== Booking Confirmation ===" + Style.RESET_ALL)
 
+            # 4.3 Display Trip info
+            print(f"Trip ID: {trip.id}")
+            print(f"Route: {trip.connection.dep_city.namee} → {trip.connection.arr_city.name}")
+            print(f"Departure time: {trip.connection.dep_time.strftime('%H:%M')}")
+            print(f"Arrival time: {trip.connection.arr_time.strftime('%H:%M')}")
+            print(f"Number of reservations/travellers: {len(trip.reservations)}")
 
+            # 4.4 Print tickets
+            print(Fore.CYAN + "\n=== Your Tickets ====" + Style.RESET_ALL)
+            for reservation in trip.reservations:
+                print(f"{reservation.traveller.first_name} {reservation.traveller.last_name} {reservation.traveller.age} - Ticket #{reservation.ticket.id}")
+
+        except Exception as e:
+            print(Fore.RED + f"Booking failed due to: {e}" + Style.RESET_ALL)
+            return
 
 # --- Main CLI ---
 def main():
