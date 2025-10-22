@@ -26,6 +26,58 @@ def ask_optional_time(prompt: str):
     val = input(Fore.CYAN + prompt + " (HH:MM or blank): " + Style.RESET_ALL).strip()
     return parse_time(val) if val else None
 
+def collect_traveller_info() -> list[dict]:
+    travellers = []
+
+    while True:
+        print(Fore.MAGENTA + "\nEnter Traveller Information:" + Style.RESEL_ALL)
+        first_name = input("First Name: ").strip()
+        last_name = input("Last Name: ").strip()
+        age = int(input("Age: ".strip()))
+        traveller_id = input("ID (passport / state ID): ".strip())
+
+        travellers.append({
+            "first_name": first_name,
+            "last_name": last_name,
+            "age": age,
+            "id": traveller_id
+        })
+
+        if not ask_yes_no("Do you want to add another traveller?"): break
+
+        return travellers
+
+    def book_trip_flow(x, booking_system):
+        print(fore.MAGENTA + "\n=== Book A Trip ===" + Style.RESET_ALL)
+
+        # 1 Search for a connection
+        print(Fore.YELLOW + "Find your connection" + Style.RESET_ALL)
+        depart_city = input("Departure city: ").strip().lower()
+        arrival_city = input("Arrival city: ").strip().lower()
+
+        connections = x.search_connections(depart_city=depart_city, arrival_city=arrival_city)
+
+        if not connections: 
+            print(Fore.RED + "No connections found. Cannot proceed with booking." + Style.RESET_ALL)
+            return
+        
+        print_connection_search_results(connections)
+
+        # 2 Client selects a connection
+        try:
+            choice = int(input(Fore.CYAN + "Select connection by number: " + Style.RESET_ALL).strip())
+            selected_connection = connections[choice - 1]
+        except (ValueError, IndexError):
+            print(Fore.RED + "Invalid selection. Booking process aborted." + Style.RESET_ALL)
+            return
+        
+        # 3 Collect traveller info
+
+        # 4  Book trip
+
+        # 5 Display confirmation
+
+
 
 # --- Main CLI ---
 def main():
