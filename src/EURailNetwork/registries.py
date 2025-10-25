@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict
-from .models import City, Train, Connection
+from .models import City, Train, Connection, Traveller, Trip, Reservation, Ticket
 from datetime import time
 import unicodedata
+from typing import Dict, List, Optional
 
 
 # this function helps normalize the data by trimming and collapsing spaces
@@ -247,3 +248,272 @@ class RailNetwork:
 
         #print(f"DEBUG: Found {len(unique)} indirect route(s) from {from_city} → {to_city}")
         return unique
+
+# helper method for normalizing the name input
+def norm_name(name: str) -> str:
+    return name.strip().lower()
+
+@dataclass
+class Travellers:
+    by_key:Dict[str, Traveller] = field(default_factory=dict)
+    
+    items: list[Traveller] = field(default_factory=list)
+
+    def get_or_create(self, first_name: str, last_name: str, age: int, id: str) -> Traveller:
+        found = self.by_key.get(id)
+        if found:
+            return found # If traveller exists, return it. stops here
+        # If traveller doesn't exist, create an instance
+        traveller = Traveller(first_name=first_name, last_name=last_name, age=age, id=id)
+        self.by_key[id] = traveller
+        self.items.append(traveller)
+        return traveller # Return newly created traveller
+    
+    def find_by_id(self, id_: str) -> Optional[Traveller]:
+        for traveller in self.items:
+            if traveller.id == id_:
+                return traveller
+       # return None # If can't find traveller from id (doesn't exist), return None
+
+    # Same as find_by_id but for last name lookup
+    def find_by_last_name(self, last_name:str) -> list[Traveller]:
+        for traveller in self.items:
+            if traveller.last_name == last_name:
+                return traveller
+        # return None
+@dataclass
+class Trips:
+    by_id: dict[str, Trip] = field(default_factory=dict)
+    items: list[Trip] = field(default_factory=list)
+
+    def create_full_trip(
+        self,
+        connection: Connection,
+        travellers: List[Traveller],
+        reservations_registry: Reservations
+    ) -> Trip:
+
+        # Create the trip (auto id)
+        trip = Trip(connection=connection)
+        trip.connections.append(connection)
+
+        # Register trip
+        for traveller in travellers:
+            ticket = Ticket(reservation=None) # Just a placeholder
+            reservation = Reservation(traveller=traveller, ticket=ticket, trip=trip)
+            ticket.reservation = reservation
+
+            trip.add_reservation(reservation)
+            traveller.add_reservation(reservation)
+            reservations_registry.add(reservation)
+
+        self.by_id[trip.id] = trip
+        self.items.append(trip)
+
+        # Return the fully constructed trip object
+        return trip
+    
+    def find_trips_by_traveller_id(self, traveller_id: str) -> list[Trip]:
+        trips = [] # If there aren't any trips, return an empty list (but shouldn't happen because for a traveller to register, needs to book a trip)
+        
+        for trip in self.items:
+            for reservation in trip.reservations:
+                if reservation.traveller.id == traveller_id:
+                    trips.append(trip)
+                    break
+
+        return trips
+    
+    def find_trips_by_traveller_last_name(self, last_name:str) -> list[Trip]:
+        trips = []
+
+        for trip in self.items:
+            for reservation in trip.reservations:
+                if reservation.traveller.last_name == last_name:
+                    trips.append(trip)
+                    break
+        return trips
+
+@dataclass
+class Reservations:
+    items: list[Reservation] = field(default_factory=list)
+
+    def add(self, reservation: Reservation):
+        self.items.append(reservation)
+
+    def find_by_traveller(self, traveller: Traveller) -> list[Reservation]:
+        return [r for r in self.items if r.traveller is traveller]
+
+    def find_by_trip(self, trip: Trip) -> list[Reservation]:
+        return [r for r in self.items if r.trip is trip]
+    
+@dataclass
+class BookingSystem:
+# Manages data (bookings, travellers, and trips)
+# Controls booking process
+# Provides view trips given traveller info
+
+    railNetwork: RailNetwork
+    travellers: Travellers = field(default_factory=Travellers)
+    trips: Trips = field(default_factory=Trips)
+
+    def book_trip(self, connection: Connection, traveller_data: list[dict]) -> Trip: # Also creates trip object
+        # Connection selected need to exist to be booked and to create a trip
+        if connection not in self.railNetwork.connections:
+            raise ValueError("Connection not found in rail network") # If there are no connections, stop here and raise error
+        
+        travellers = []
+        for data in traveller_data:
+            # Creates/Gets traveller for every traveller data provided
+            traveller = self.travellers.get_or_create(
+                first_name=data["first_name"],
+                last_name=data["last_name"],
+                age=data["age"],
+                id=data["id"]
+            )
+            travellers.append(traveller) # Add each traveller to list
+
+        trip = Trip()
+        trip.connections.append(connection)
+
+        for traveller in travellers:
+            ticket = Ticket(reservation=None)
+            reservation = Reservation(
+                traveller=traveller,
+                ticket=ticket,
+                trip=trip
+            )
+            ticket.reservation = reservation
+            trip.add_reservation(reservation)
+            traveller.add_reservation(reservation)
+
+        self.trips.items.append(trip)
+        self.trips.by_id[trip.id] = trip
+        return trip
+    
+    def view_trips_given_traveller(self, traveller_last_name: str, traveller_id: str = None) -> list[Trip]:
+        if traveller_id:
+            return self.trips.find_trips_by_traveller_id(traveller_id)
+        else:
+            return self.trips.find_trips_by_traveller_last_name(traveller_last_name)
+    
+    def save_trips(self, filepath: str = "trip_data.json") -> None:
+        #Save all trips and traveller data to JSON file.
+        import json
+        
+        data = {
+            "travellers": [],
+            "trips": []
+        }
+        
+        # Save travellers
+        for traveller in self.travellers.items:
+            data["travellers"].append({
+                "first_name": traveller.first_name,
+                "last_name": traveller.last_name,
+                "age": traveller.age,
+                "id": traveller.id
+            })
+        
+        # Save trips
+        for trip in self.trips.items:
+            trip_data = {
+                "id": trip.id,
+                "connections": [],
+                "reservations": []
+            }
+            
+            # Save connections
+            for conn in trip.connections:
+                trip_data["connections"].append({
+                    "route_id": conn.route_id,
+                    "dep_city": conn.dep_city.name,
+                    "arr_city": conn.arr_city.name,
+                    "dep_time": conn.dep_time.strftime("%H:%M"),
+                    "arr_time": conn.arr_time.strftime("%H:%M"),
+                    "train": conn.train.name,
+                    "first_class_eur": conn.first_class_eur,
+                    "second_class_eur": conn.second_class_eur,
+                    "trip_minutes": conn.trip_minutes
+                })
+            
+            # Save reservations
+            for reservation in trip.reservations:
+                trip_data["reservations"].append({
+                    "traveller_id": reservation.traveller.id,
+                    "ticket_id": reservation.ticket.id
+                })
+            
+            data["trips"].append(trip_data)
+        
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+    
+    def load_trips(self, filepath: str = "trip_data.json") -> None:
+        # Load trips and traveller data from JSON file.
+        import json
+        import os
+        
+        if not os.path.exists(filepath):
+            return 
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            
+            # Load travellers
+            traveller_map = {}
+            for t_data in data.get("travellers", []):
+                traveller = self.travellers.get_or_create(
+                    first_name=t_data["first_name"],
+                    last_name=t_data["last_name"],
+                    age=t_data["age"],
+                    id=t_data["id"]
+                )
+                traveller_map[t_data["id"]] = traveller
+            
+            # Load trips
+            for trip_data in data.get("trips", []):
+                route_id = trip_data["connections"][0]["route_id"]
+                connection = None
+                for conn in self.railNetwork.connections:
+                    if conn.route_id == route_id:
+                        connection = conn
+                        break
+                
+                if connection is None:
+                    continue 
+                
+                # Recreate trip
+                trip = Trip(id=trip_data["id"])
+                trip.connections.append(connection)
+                
+                # Recreate reservations
+                for res_data in trip_data["reservations"]:
+                    traveller = traveller_map.get(res_data["traveller_id"])
+                    if traveller is None:
+                        continue
+                    
+                    ticket = Ticket(reservation=None)
+                    ticket.id = res_data["ticket_id"]
+                    
+                    reservation = Reservation(
+                        traveller=traveller,
+                        ticket=ticket,
+                        trip=trip
+                    )
+                    ticket.reservation = reservation
+                    
+                    trip.add_reservation(reservation)
+                    traveller.add_reservation(reservation)
+                
+                # Register trip
+                self.trips.items.append(trip)
+                self.trips.by_id[trip.id] = trip
+                
+        except Exception as e:
+            print(f"Warning: Could not load saved trip data: {e}")
+    
+
+
+
+

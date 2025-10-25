@@ -1,5 +1,8 @@
 import argparse
 from colorama import Fore, Style, init
+from datetime import datetime, time as dt_time
+
+from EURailNetwork.registries import BookingSystem
 from .loader import read_raw_csv, build_network_from_df
 from .inspectors import (
     print_summary,
@@ -26,6 +29,196 @@ def ask_optional_time(prompt: str):
     val = input(Fore.CYAN + prompt + " (HH:MM or blank): " + Style.RESET_ALL).strip()
     return parse_time(val) if val else None
 
+def collect_traveller_info() -> list[dict]:
+    travellers = []
+
+    while True:
+        print(Fore.MAGENTA + "\nEnter Traveller Information:" + Style.RESET_ALL)
+        first_name = input("First Name: ").strip()
+        last_name = input("Last Name: ").strip()
+
+        while True:
+            try:
+                age_input = input("Age: ").strip()
+                age = int(age_input)
+                if age < 0 or age > 150:
+                    print(Fore.RED + "Please enter a valid age (0-150)." + Style.RESET_ALL)
+                    continue
+                break
+            except ValueError:
+                print(Fore.RED + "Invalid input. Please enter a number for age." + Style.RESET_ALL)
+        
+        traveller_id = input("ID (passport / state ID): ").strip()
+
+        travellers.append({
+            "first_name": first_name,
+            "last_name": last_name,
+            "age": age,
+            "id": traveller_id
+        })
+
+        if not ask_yes_no("Do you want to add another traveller?"): 
+            break
+
+    return travellers
+
+def book_trip_flow(g, booking_system):
+    print(Fore.MAGENTA + "\n=== Book A Trip ===" + Style.RESET_ALL)
+
+    # 1 Search for a connection
+    print(Fore.YELLOW + "Find your connection" + Style.RESET_ALL)
+    depart_city = input("Departure city: ").strip().lower()
+    arrival_city = input("Arrival city: ").strip().lower()
+
+    connections = g.search_connections(depart_city=depart_city, arrival_city=arrival_city)
+
+    if not connections: 
+        print(Fore.RED + "No connections found. Cannot proceed with booking." + Style.RESET_ALL)
+        return
+        
+    print_connection_search_results(connections)
+
+        # 2 Client selects a connection
+    try:
+        choice = int(input(Fore.CYAN + "Select connection by number: " + Style.RESET_ALL).strip())
+        selected_connection = connections[choice - 1]
+    except (ValueError, IndexError):
+        print(Fore.RED + "Invalid selection. Booking process aborted." + Style.RESET_ALL)
+        return
+        
+    # 3 Collect traveller info
+    travellers_data = collect_traveller_info()
+
+    # 4.1  Book trip
+    try:
+        trip = booking_system.book_trip(selected_connection, travellers_data)
+
+        # 4.2 Display booking confirmation
+        print(Fore.GREEN + "\n=== Booking Confirmation ===" + Style.RESET_ALL)
+
+        # 4.3 Display Trip info
+        print(f"Trip ID: {trip.id}")
+        print(f"Route: {trip.connections[0].dep_city.name} → {trip.connections[0].arr_city.name}")
+        print(f"Departure time: {trip.connections[0].dep_time.strftime('%H:%M')}")
+        print(f"Arrival time: {trip.connections[0].arr_time.strftime('%H:%M')}")
+        print(f"Number of reservations/travellers: {len(trip.reservations)}")
+
+        # 4.4 Print tickets
+        print(Fore.CYAN + "\n=== Your Tickets ====" + Style.RESET_ALL)
+        for reservation in trip.reservations:
+            print(f"{reservation.traveller.first_name} {reservation.traveller.last_name} {reservation.traveller.age} - Ticket #{reservation.ticket.id}")
+
+        print("\nThank you for booking with EURail Network Interactive CLI.\n")
+        return trip
+    except Exception as e:
+        print(Fore.RED + f"Booking failed due to: {e}" + Style.RESET_ALL)
+        return None
+        
+# To view past trips
+def view_trips_flow(booking_system):
+
+    print(Fore.MAGENTA + "\n=== View My Trips ===" + Style.RESET_ALL)
+    last_name = input(Fore.CYAN + "Enter your last name: " + Style.RESET_ALL).strip()
+    traveller_id = input(Fore.CYAN + "Enter your ID (passport/state ID): " + Style.RESET_ALL).strip()
+    
+    traveller = booking_system.travellers.by_key.get(traveller_id)
+    
+    if traveller is None:
+        print(Fore.RED + f"No traveller found with ID '{traveller_id}'." + Style.RESET_ALL)
+        return
+    
+    if traveller.last_name.lower() != last_name.lower():
+        print(Fore.RED + f"Last name does not match for ID '{traveller_id}'." + Style.RESET_ALL)
+        return
+    
+    trips = traveller.list_trips()
+    
+    if not trips:
+        print(Fore.YELLOW + f"\nNo trips found for {traveller.first_name} {traveller.last_name}." + Style.RESET_ALL)
+        return
+    
+    # Separate trips into upcoming/future and past
+    # Note: Since we don't have actual dates, all trips are shown as upcoming/future
+    upcoming_trips = trips
+    past_trips = []
+    
+    print(Fore.GREEN + f"\n=== Trip History for {traveller.first_name} {traveller.last_name} ===" + Style.RESET_ALL)
+    print(Fore.CYAN + f"Total trips: {len(trips)}" + Style.RESET_ALL)
+    print(Fore.CYAN + f"Upcoming/Future trips: {len(upcoming_trips)}" + Style.RESET_ALL)
+    print(Fore.CYAN + f"Past trips: {len(past_trips)}" + Style.RESET_ALL)
+    
+    # Display list of trips with summary
+    while True:
+        if upcoming_trips:
+            print(Fore.GREEN + f"\n=== Upcoming/Future Trips ===" + Style.RESET_ALL)
+            display_trips_list(upcoming_trips, traveller)
+        
+        if past_trips:
+            print(Fore.LIGHTBLACK_EX + f"\n=== Past Trips ===" + Style.RESET_ALL)
+            display_trips_list(past_trips, traveller)
+        
+        print(Fore.YELLOW + "\nOptions:" + Style.RESET_ALL)
+        print("  Enter trip number to view details")
+        print("  Or press Enter to go back to main menu")
+        
+        choice = input(Fore.CYAN + "Your choice: " + Style.RESET_ALL).strip()
+        
+        if not choice:
+            break
+        
+        try:
+            trip_num = int(choice)
+            if 1 <= trip_num <= len(trips):
+                display_trip_details(trips[trip_num - 1], traveller)
+            else:
+                print(Fore.RED + f"Invalid trip number. Please enter 1-{len(trips)}" + Style.RESET_ALL)
+        except ValueError:
+            print(Fore.RED + "Invalid input. Please enter a number or press Enter." + Style.RESET_ALL)
+
+def display_trips_list(trips, current_traveller):
+    for i, trip in enumerate(trips, 1):
+        if trip.connections:
+            conn = trip.connections[0]
+            traveller_count = len(trip.reservations)
+            status = "Upcoming"  
+            
+            print(f"{i}. Trip {trip.id} | {conn.dep_city.name} → {conn.arr_city.name} | "
+                  f"Dep: {conn.dep_time.strftime('%H:%M')} | {traveller_count} traveller(s) | "
+                  f"Status: {status}")
+
+def display_trip_details(trip, current_traveller):
+    print(Fore.YELLOW + f"\n{'=' * 70}" + Style.RESET_ALL)
+    print(Fore.YELLOW + f"TRIP DETAILS" + Style.RESET_ALL)
+    print(Fore.YELLOW + f"{'=' * 70}" + Style.RESET_ALL)
+    
+    print(Fore.GREEN + f"\nTrip ID: {trip.id}" + Style.RESET_ALL)
+    print(f"Status: Upcoming/Future")  
+    
+    # Display connection information
+    if trip.connections:
+        conn = trip.connections[0]
+        print(Fore.CYAN + f"\n--- Connection Information ---" + Style.RESET_ALL)
+        print(f"Route: {conn.dep_city.name} → {conn.arr_city.name}")
+        print(f"Train: {conn.train.name}")
+        print(f"Departure: {conn.dep_time.strftime('%H:%M')}")
+        print(f"Arrival: {conn.arr_time.strftime('%H:%M')}")
+        print(f"Duration: {conn.trip_minutes} minutes ({conn.trip_minutes // 60}h {conn.trip_minutes % 60}m)")
+        print(f"First Class Price: €{conn.first_class_eur}")
+        print(f"Second Class Price: €{conn.second_class_eur}")
+    
+    # Display travellers and ticket information
+    print(Fore.CYAN + f"\n--- Travellers & Tickets ---" + Style.RESET_ALL)
+    for reservation in trip.reservations:
+        marker = "(You)" if reservation.traveller.id == current_traveller.id else ""
+        print(f"  • {reservation.traveller.first_name} {reservation.traveller.last_name}, "
+              f"Age {reservation.traveller.age}")
+        print(f"    Ticket #: {reservation.ticket.id}{marker}")
+    
+    print(Fore.YELLOW + f"\n{'=' * 70}" + Style.RESET_ALL)
+    
+    # Wait for user to go back
+    input(Fore.CYAN + "\nPress Enter to go back to trip list..." + Style.RESET_ALL)
+
 
 # --- Main CLI ---
 def main():
@@ -38,19 +231,23 @@ def main():
     # Load dataset
     df = read_raw_csv(args.csv_path)
     g = build_network_from_df(df)
+    booking_system = BookingSystem(railNetwork=g)
+    booking_system.load_trips()
 
     print(Fore.MAGENTA + "\nEURail Network Interactive CLI" + Style.RESET_ALL)
     print(Fore.LIGHTBLACK_EX + "----------------------------------------------\n" + Style.RESET_ALL)
 
     while True:
-        print(Fore.CYAN + "MAIN MENU" + Style.RESET_ALL)
+        print(Fore.CYAN + "=== MAIN MENU ===" + Style.RESET_ALL)
         print(Fore.GREEN + "1." + Style.RESET_ALL, "View Network Summary")
         print(Fore.GREEN + "2." + Style.RESET_ALL, "Search for a Connection")
         print(Fore.GREEN + "3." + Style.RESET_ALL, "View City Info")
         print(Fore.GREEN + "4." + Style.RESET_ALL, "View Train Info")
-        print(Fore.RED + "5." + Style.RESET_ALL, "Exit")
+        print(Fore.GREEN + "5." + Style.RESET_ALL, "Book a Trip")
+        print(Fore.GREEN + "6." + Style.RESET_ALL, "View My Trips")
+        print(Fore.RED + "7." + Style.RESET_ALL, "Exit")
 
-        choice = input(Fore.YELLOW + "\nEnter your choice (1-5): " + Style.RESET_ALL).strip()
+        choice = input(Fore.YELLOW + "\nEnter your choice (1-7): " + Style.RESET_ALL).strip()
 
         # --- Option 1: Summary ---
         if choice == "1":
@@ -233,13 +430,25 @@ def main():
             train = input(Fore.CYAN + "Enter train name: " + Style.RESET_ALL).strip().lower()
             print_train(g, train, limit=args.head)
 
-        # --- Option 5: Exit ---
+        # --- Option 5: Book a Trip ---
         elif choice == "5":
+            trip = book_trip_flow(g, booking_system)
+            if trip:
+                booking_system.save_trips()
+
+        # --- Option 6: View My Trips ---
+        elif choice == "6":
+            view_trips_flow(booking_system)
+        
+        # --- Option 7: Exit ---
+        elif choice == "7":
+            # Save all trip data before exiting
+            booking_system.save_trips()
             print(Fore.LIGHTRED_EX + "\nExiting the program. Goodbye.\n" + Style.RESET_ALL)
             break
 
         else:
-            print(Fore.RED + "Invalid choice. Please enter a number between 1 and 5.\n" + Style.RESET_ALL)
+            print(Fore.RED + "Invalid choice. Please enter a number between 1 and 7.\n" + Style.RESET_ALL)
 
 
 # Code runs only when module is executed (not when imported)
