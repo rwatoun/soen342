@@ -47,10 +47,9 @@ class Trip:
     reservations: list["Reservation"] = field(default_factory=list)
     connections: list["Connection"] = field(default_factory=list)
 
-    # Adding reservation
+    # Adding reservation - no duplicate check to avoid circular comparison
     def add_reservation(self, reservation: "Reservation") -> None:
-        if reservation not in self.reservations: 
-            self.reservations.append(reservation)
+        self.reservations.append(reservation)
 
 @dataclass
 class Traveller:
@@ -61,16 +60,16 @@ class Traveller:
     reservations: list["Reservation"]   = field(default_factory=list)
 
     def add_reservation(self, reservation: "Reservation") -> None:
-        if reservation not in self.reservations:
-            self.reservations.append(reservation)
+        # No duplicate check to avoid circular comparison issues
+        self.reservations.append(reservation)
 
     def list_trips(self) -> list["Trip"]:
         return [r.trip for r in self.reservations]
 
-@dataclass
+@dataclass(eq=False)  # Disable automatic equality to prevent circular comparison
 class Reservation:
     traveller: Traveller
-    ticket: Ticket
+    ticket: "Ticket"
     trip: Trip
 
     # Debugging method
@@ -86,10 +85,10 @@ class Reservation:
             f"on trip {self.trip.id} ({route}) - ticket #: {self.ticket.id}"
          )
 
-@dataclass
+@dataclass(eq=False)  # Disable automatic equality to prevent circular comparison
 class Ticket:
-    reservation: Reservation
-    _id_counter: int = 0  # this is a class variable that is not part of instances so the ticket id increments every time
+    reservation: "Reservation" = None  # Allow None to break circular dependency
+    _id_counter: int = field(default=0, init=False, repr=False, compare=False)
     id: int = field(init=False)
 
     def __post_init__(self):

@@ -397,6 +397,122 @@ class BookingSystem:
         else:
             return self.trips.find_trips_by_traveller_last_name(traveller_last_name)
     
+    def save_trips(self, filepath: str = "trip_data.json") -> None:
+        #Save all trips and traveller data to JSON file.
+        import json
+        
+        data = {
+            "travellers": [],
+            "trips": []
+        }
+        
+        # Save travellers
+        for traveller in self.travellers.items:
+            data["travellers"].append({
+                "first_name": traveller.first_name,
+                "last_name": traveller.last_name,
+                "age": traveller.age,
+                "id": traveller.id
+            })
+        
+        # Save trips
+        for trip in self.trips.items:
+            trip_data = {
+                "id": trip.id,
+                "connections": [],
+                "reservations": []
+            }
+            
+            # Save connections
+            for conn in trip.connections:
+                trip_data["connections"].append({
+                    "route_id": conn.route_id,
+                    "dep_city": conn.dep_city.name,
+                    "arr_city": conn.arr_city.name,
+                    "dep_time": conn.dep_time.strftime("%H:%M"),
+                    "arr_time": conn.arr_time.strftime("%H:%M"),
+                    "train": conn.train.name,
+                    "first_class_eur": conn.first_class_eur,
+                    "second_class_eur": conn.second_class_eur,
+                    "trip_minutes": conn.trip_minutes
+                })
+            
+            # Save reservations
+            for reservation in trip.reservations:
+                trip_data["reservations"].append({
+                    "traveller_id": reservation.traveller.id,
+                    "ticket_id": reservation.ticket.id
+                })
+            
+            data["trips"].append(trip_data)
+        
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+    
+    def load_trips(self, filepath: str = "trip_data.json") -> None:
+        # Load trips and traveller data from JSON file.
+        import json
+        import os
+        
+        if not os.path.exists(filepath):
+            return 
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            
+            # Load travellers
+            traveller_map = {}
+            for t_data in data.get("travellers", []):
+                traveller = self.travellers.get_or_create(
+                    first_name=t_data["first_name"],
+                    last_name=t_data["last_name"],
+                    age=t_data["age"],
+                    id=t_data["id"]
+                )
+                traveller_map[t_data["id"]] = traveller
+            
+            # Load trips
+            for trip_data in data.get("trips", []):
+                route_id = trip_data["connections"][0]["route_id"]
+                connection = None
+                for conn in self.railNetwork.connections:
+                    if conn.route_id == route_id:
+                        connection = conn
+                        break
+                
+                if connection is None:
+                    continue 
+                
+                # Recreate trip
+                trip = Trip(id=trip_data["id"])
+                trip.connections.append(connection)
+                
+                # Recreate reservations
+                for res_data in trip_data["reservations"]:
+                    traveller = traveller_map.get(res_data["traveller_id"])
+                    if traveller is None:
+                        continue
+                    
+                    ticket = Ticket(reservation=None)
+                    ticket.id = res_data["ticket_id"]
+                    
+                    reservation = Reservation(
+                        traveller=traveller,
+                        ticket=ticket,
+                        trip=trip
+                    )
+                    ticket.reservation = reservation
+                    
+                    trip.add_reservation(reservation)
+                    traveller.add_reservation(reservation)
+                
+                # Register trip
+                self.trips.items.append(trip)
+                self.trips.by_id[trip.id] = trip
+                
+        except Exception as e:
+            print(f"Warning: Could not load saved trip data: {e}")
+    
 
 
 
