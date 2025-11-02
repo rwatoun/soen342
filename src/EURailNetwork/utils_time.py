@@ -74,3 +74,7 @@ def calculate_wait_time(arrival: time, next_departure: time) -> int:
         wait += 24 * 60  
         # handle overnight connection
     return wait
+
+def format_time(t: time) -> str:
+    """Format a time object as 'HH:MM' for storage or display."""
+    return t.strftime("%H:%M")

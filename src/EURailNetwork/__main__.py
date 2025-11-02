@@ -1,6 +1,7 @@
 import argparse
 from colorama import Fore, Style, init
 from datetime import datetime, time as dt_time
+from . import db_sqlite
 
 from EURailNetwork.registries import BookingSystem
 from .loader import read_raw_csv, build_network_from_df
@@ -232,7 +233,20 @@ def main():
     df = read_raw_csv(args.csv_path)
     g = build_network_from_df(df)
     booking_system = BookingSystem(railNetwork=g)
-    booking_system.load_trips()
+
+    # sqlite loading ***********************************************!!!!
+    conn = db_sqlite.connect("eurail.db") 
+    db_sqlite.migrate(conn)
+
+    # save static network 
+    db_sqlite.save_network(conn, g)
+
+    # load previously saved trips/reservations from db into memory
+    db_sqlite.load_trips(conn, booking_system, g)
+
+
+
+    # booking_system.load_trips() no loads from json we only want db
 
     print(Fore.MAGENTA + "\nEURail Network Interactive CLI" + Style.RESET_ALL)
     print(Fore.LIGHTBLACK_EX + "----------------------------------------------\n" + Style.RESET_ALL)
@@ -434,7 +448,11 @@ def main():
         elif choice == "5":
             trip = book_trip_flow(g, booking_system)
             if trip:
-                booking_system.save_trips()
+                # booking_system.save_trips() now we want to save to db directly
+                try:
+                    db_sqlite.save_trip(conn, trip)
+                except Exception as e:
+                    print(Fore.RED + f"Can't persist trip to DB: {e}" + Style.RESET_ALL)
 
         # --- Option 6: View My Trips ---
         elif choice == "6":
@@ -443,7 +461,7 @@ def main():
         # --- Option 7: Exit ---
         elif choice == "7":
             # Save all trip data before exiting
-            booking_system.save_trips()
+            booking_system.save_trips() 
             print(Fore.LIGHTRED_EX + "\nExiting the program. Goodbye.\n" + Style.RESET_ALL)
             break
 
