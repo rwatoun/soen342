@@ -47,9 +47,32 @@ class Trip:
     reservations: list["Reservation"] = field(default_factory=list)
     connections: list["Connection"] = field(default_factory=list)
 
-    # Adding reservation - no duplicate check to avoid circular comparison
+    # Add reservation - no duplicate check to avoid circular comparison
     def add_reservation(self, reservation: "Reservation") -> None:
         self.reservations.append(reservation)
+
+    def _layover_difference_min(self, t1:time, t2:time) -> int: # returns layover duration in minutes (int)
+
+
+    # Add layover rules #################################
+        # Daytime: No layovers of more than 2 hours
+        # Nighttime: No layovers of more than 30 minutes
+        # At any time of day: At least 10 min to walk to the right stop and prepare tickets and suitcases
+    def validate_layover(self) -> bool:
+        for i in range(len(self.connections)-1):
+            current_arr = self.connections[i].arr_time
+            next_dept = self.connections[i+1].dep_time
+
+            # calculate layover duration in min to make sure it respects layover rules
+            layover_duration = self._layover_difference_min(current_arr,next_dept)
+
+            # daytime layover rule: 2 hours or less
+            if 6 <= next_dept.hour < 19: # daytime = between 6AM (incl) - 7PM (excl)
+                if not (10 <= layover_duration <= 120):
+                    return False
+            if 19 <= next_dept.hour < 6: # nighttime = between 7PM (incl) - 6AM (excl)
+                if not (10 <= layover_duration <= 30):
+                    return False
 
 @dataclass
 class Traveller:

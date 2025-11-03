@@ -7,11 +7,12 @@ from .registries import RailNetwork, BookingSystem
 from .utils_time import parse_time, format_time
 
 
-def connect(db_path: str = "eurail.db") -> sqlite3.Connection:
+def connect(db_path: str = "eurail.db") -> sqlite3.Connection: # create/open database file
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+# create tables
 def migrate(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
     cur.executescript("""
