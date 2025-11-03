@@ -1,32 +1,31 @@
-# soen342
+# SOEN 342 - II 
+# EU Rail Network
 
-# Team Members
+Team Members
 | Full Name      | Username     | Student ID |
 | -------------- | ------------ | ---------- |
 | Marwa Hammani  | @rwatoun     | 40289362   |
 | Justyne Phan   | @JustynePhan | 40278509   |
 | Elif Sag Sesen | @elif5446    | 40283343   |
 
-Must have Python installed.
-
-- Depending on your Python version, you might have to replace the python command with python3.
-
-- Colorama library (for colored CLI output)
+Must have Python installed.  
+Depending on your Python version, you might have to replace the python command with python3.  
+Colorama library (for colored CLI output).  
 
 
-After cloning the repository:
-
-```python -m venv .venv```
-
-```pip install -e .```
-
-```pip install colorama```
-
-To run the program: ```python -m EURailNetwork data/eu_rail_network.csv```
+After cloning the repository:  
+```python -m venv .venv```  
+```pip install -e .```  
+```pip install colorama```  
+To **run** the program: ```python -m EURailNetwork data/eu_rail_network.csv```
 
 This will launch the interactive menu where you can view the network summary, search for connections, view city information, or view train details.  
 
-To run tests: ```pytest -v```
+To run **tests**: ```pytest -v```  
 
-To run sqlite cli and interact with tables and data:
-```sqlite3 eurail.db```
+To run **SQLite CLI** and interact with tables and data:  
+Open database: ```sqlite3 eurail.db```  
+View tables: ``` .tables```  
+View schema structure: ``` .schema TableName``` 
+
+
