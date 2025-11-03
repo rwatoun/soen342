@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict
+
 from .models import City, Train, Connection, Traveller, Trip, Reservation, Ticket
 from datetime import time
 import unicodedata
@@ -358,10 +359,22 @@ class BookingSystem:
     trips: Trips = field(default_factory=Trips)
 
     def book_trip(self, connection: Connection, traveller_data: list[dict]) -> Trip: # Also creates trip object
-        # Connection selected need to exist to be booked and to create a trip
+        from EURailNetwork.db_sqlite import save_trip
+        # validate connection - Connection selected need to exist to be booked and to create a trip
         if connection not in self.railNetwork.connections:
             raise ValueError("Connection not found in rail network") # If there are no connections, stop here and raise error
         
+        # validate layover duration with a temporary trip id (trip layover needs to be validated before its id is generated)
+        t = Trip(id="temp", connection=connection)
+        if not t.validate_layover():
+            raise ValueError("Trip doesn't satisfy our layover rules.")
+
+        # generate unique trip id
+        trip_id = self.generate_trip_id()
+
+        # create trip
+        trip = Trip(id=trip_id, connection=connection)
+
         travellers = []
         for data in traveller_data:
             # Creates/Gets traveller for every traveller data provided
@@ -373,7 +386,6 @@ class BookingSystem:
             )
             travellers.append(traveller) # Add each traveller to list
 
-        trip = Trip()
         trip.connections.append(connection)
 
         for traveller in travellers:
@@ -389,6 +401,8 @@ class BookingSystem:
 
         self.trips.items.append(trip)
         self.trips.by_id[trip.id] = trip
+        self.save_trip_to_db(trip=trip)
+        
         return trip
     
     def view_trips_given_traveller(self, traveller_last_name: str, traveller_id: str = None) -> list[Trip]:
@@ -449,6 +463,10 @@ class BookingSystem:
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
     
+    # saving created trip to db using function in dq_sqlite.py
+    def save_trip_to_db(self, trip: Trip) -> None:
+        save_trip(self.conn, trip)
+
     def load_trips(self, filepath: str = "trip_data.json") -> None:
         # Load trips and traveller data from JSON file.
         import json

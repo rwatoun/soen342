@@ -10,6 +10,7 @@ from .inspectors import (
     print_city,
     print_train,
     print_connection_search_results,
+    print_indirect_connection_results
 )
 from .utils_time import parse_time
 
@@ -71,18 +72,36 @@ def book_trip_flow(g, booking_system):
     depart_city = input("Departure city: ").strip().lower()
     arrival_city = input("Arrival city: ").strip().lower()
 
-    connections = g.search_connections(depart_city=depart_city, arrival_city=arrival_city)
+    direct_connections = g.search_connections(depart_city=depart_city, arrival_city=arrival_city)
+    indirect_connections = g.find_indirect_connections(from_city=depart_city, to_city=arrival_city)
 
-    if not connections: 
-        print(Fore.RED + "No connections found. Cannot proceed with booking." + Style.RESET_ALL)
-        return
-        
-    print_connection_search_results(connections)
+    # check if there are any connections
+    if not indirect_connections and not direct_connections:
+        print(Fore.RED + "No connections found between the specified cities. Booking process aborted." + Style.RESET_ALL)
+        return None
 
+    # display direct connections 
+    if direct_connections:
+        print_connection_search_results(direct_connections)
+    else:
+        print(Fore.RED + "No direct connections found." + Style.RESET_ALL)
+
+    # display indirect connections 
+    if indirect_connections:
+        print_indirect_connection_results(indirect_connections)
+    else: 
+        print(Fore.RED + "No indirect connections found." + Style.RESET_ALL)
+
+    # Combine all connections for selection
+    all_connections = []
+    all_connections.extend(direct_connections)
+    for route in indirect_connections:
+        all_connections.append(route["segments"])
+    
         # 2 Client selects a connection
     try:
         choice = int(input(Fore.CYAN + "Select connection by number: " + Style.RESET_ALL).strip())
-        selected_connection = connections[choice - 1]
+        selected_connection = all_connections[choice - 1]
     except (ValueError, IndexError):
         print(Fore.RED + "Invalid selection. Booking process aborted." + Style.RESET_ALL)
         return

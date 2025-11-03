@@ -51,8 +51,11 @@ class Trip:
     def add_reservation(self, reservation: "Reservation") -> None:
         self.reservations.append(reservation)
 
-    def _layover_difference_min(self, t1:time, t2:time) -> int: # returns layover duration in minutes (int)
-
+    # calculate layover
+    def _layover_min(self, t1:time, t2:time) -> int: # returns layover duration in minutes (int)
+        min1 = (t1.hour * 60) + t1.minute
+        min2 = (t2.hour * 60) + t2.minute
+        return min1 - min2 if min2 >= min1 else (1440 - min1) + min2
 
     # Add layover rules #################################
         # Daytime: No layovers of more than 2 hours
@@ -64,15 +67,17 @@ class Trip:
             next_dept = self.connections[i+1].dep_time
 
             # calculate layover duration in min to make sure it respects layover rules
-            layover_duration = self._layover_difference_min(current_arr,next_dept)
+            layover_duration = self._layover_min(current_arr,next_dept)
 
             # daytime layover rule: 2 hours or less
             if 6 <= next_dept.hour < 19: # daytime = between 6AM (incl) - 7PM (excl)
                 if not (10 <= layover_duration <= 120):
                     return False
-            if 19 <= next_dept.hour < 6: # nighttime = between 7PM (incl) - 6AM (excl)
+            elif 19 <= next_dept.hour < 6: # nighttime = between 7PM (incl) - 6AM (excl)
                 if not (10 <= layover_duration <= 30):
                     return False
+                
+        return True
 
 @dataclass
 class Traveller:
