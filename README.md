@@ -22,13 +22,11 @@ After cloning the repository:
 
 ```pip install colorama```
 
-To run the program:
+To run the program: ```python -m EURailNetwork data/eu_rail_network.csv```
 
-```python -m EURailNetwork data/eu_rail_network.csv```
+This will launch the interactive menu where you can view the network summary, search for connections, view city information, or view train details.  
 
-This will launch the interactive menu where you can view the network summary, search for connections, view city information, or view train details.
+To run tests: ```pytest -v```
 
-To run tests:
-
-```pytest -v```
-
+To run sqlite cli and interact with tables and data:
+```sqlite3 eurail.db```
