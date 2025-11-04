@@ -64,7 +64,7 @@ def collect_traveller_info() -> list[dict]:
 
     return travellers
 
-def book_trip_flow(g, booking_system):
+def book_trip_flow(g, booking_system, db_connection=None):
     print(Fore.MAGENTA + "\n=== Book A Trip ===" + Style.RESET_ALL)
 
     # 1 Search for a connection
@@ -94,10 +94,28 @@ def book_trip_flow(g, booking_system):
 
     # Combine all connections for selection
     all_connections = []
-    all_connections.extend(direct_connections)
-    for route in indirect_connections:
-        all_connections.append(route["segments"])
-    
+    option_count = 1
+
+    for c in direct_connections:
+        all_connections.append({
+            "type": "direct",
+            "connection": c,
+            "connections": [c],
+            "display": f"{option_count}. Direct: {c.dep_city.name} → {c.arr_city.name} ({c.dep_time} - {c.arr_time})"
+        })
+        option_count += 1
+
+    # Add indirect connections  
+    for result in indirect_connections:
+        segments = result["segments"]
+        route_desc = " → ".join(f"{conn.dep_city.name}" for conn in segments) + f" → {segments[-1].arr_city.name}"
+        all_connections.append({
+            "type": "indirect", 
+            "connections": segments,  # List of connections
+            "display": f"Indirect ({len(segments)} stops): {route_desc} - Total: {result['total_minutes']}min"
+        })
+        option_count += 1
+
         # 2 Client selects a connection
     try:
         choice = int(input(Fore.CYAN + "Select connection by number: " + Style.RESET_ALL).strip())
@@ -109,19 +127,49 @@ def book_trip_flow(g, booking_system):
     # 3 Collect traveller info
     travellers_data = collect_traveller_info()
 
+    # Extract the actual Connection objects to book
+    if selected_connection["type"] == "direct":
+        connections_to_book = selected_connection["connections"]
+    else:  # indirect
+        connections_to_book = selected_connection["connections"]
+
     # 4.1  Book trip
     try:
-        trip = booking_system.book_trip(selected_connection, travellers_data)
+        trip = booking_system.book_trip(connections_to_book, travellers_data)
 
         # 4.2 Display booking confirmation
         print(Fore.GREEN + "\n=== Booking Confirmation ===" + Style.RESET_ALL)
-
+        print(f"Trip ID: {trip.id}")   
+        
         # 4.3 Display Trip info
-        print(f"Trip ID: {trip.id}")
-        print(f"Route: {trip.connections[0].dep_city.name} → {trip.connections[0].arr_city.name}")
-        print(f"Departure time: {trip.connections[0].dep_time.strftime('%H:%M')}")
-        print(f"Arrival time: {trip.connections[0].arr_time.strftime('%H:%M')}")
-        print(f"Number of reservations/travellers: {len(trip.reservations)}")
+        # 4.3.1 Single connection trip
+        if len(trip.connections) > 0:
+            if len(trip.connections) == 1:
+                print(f"Route: {trip.connections[0].dep_city.name} → {trip.connections[0].arr_city.name}")
+                print(f"Departure time: {trip.connections[0].dep_time.strftime('%H:%M')}")
+                print(f"Arrival time: {trip.connections[0].arr_time.strftime('%H:%M')}")
+                print(f"Number of reservations/travellers: {len(trip.reservations)}")
+        # 4.3.2 Multi-connection trip
+            else:
+                route = []
+                route_string = ""
+                for c in trip.connections:
+                    route.append(f"{c.dep_city.name}")
+                route.append(f"{trip.connections[-1].arr_city.name}")
+                route_string = " → ".join(route)
+                print(f"Route: {route_string}")
+                print(f"Number of segments: {len(trip.connections)}")
+
+                # layover durations between connections
+                print("\nMulti-Connection Details:")
+                for i, conn in enumerate(trip.connections):
+                    print(f"  Segment {i+1}: {conn.dep_city.name} → {conn.arr_city.name}")
+                    print(f"    {conn.dep_time} - {conn.arr_time} ({conn.train.name})")
+                
+            if db_connection:
+                booking_system.save_trip_to_db(trip, db_connection)
+            else:
+                print(Fore.YELLOW + "Warning: No database connection available to save trip" + Style.RESET_ALL)
 
         # 4.4 Print tickets
         print(Fore.CYAN + "\n=== Your Tickets ====" + Style.RESET_ALL)
@@ -251,11 +299,11 @@ def main():
     # Load dataset
     df = read_raw_csv(args.csv_path)
     g = build_network_from_df(df)
-    booking_system = BookingSystem(railNetwork=g)
 
     # sqlite loading ***********************************************!!!!
     conn = db_sqlite.connect("eurail.db") 
     db_sqlite.migrate(conn)
+    booking_system = BookingSystem(railNetwork=g, db_connection=conn)
 
     # save static network 
     db_sqlite.save_network(conn, g)
@@ -263,7 +311,8 @@ def main():
     # load previously saved trips/reservations from db into memory
     db_sqlite.load_trips(conn, booking_system, g)
 
-
+    # debug
+    print(f"Number of connections in network: {len(booking_system.railNetwork.connections)}")
 
     # booking_system.load_trips() no loads from json we only want db
 
@@ -465,13 +514,9 @@ def main():
 
         # --- Option 5: Book a Trip ---
         elif choice == "5":
-            trip = book_trip_flow(g, booking_system)
+            trip = book_trip_flow(g, booking_system,conn)
             if trip:
-                # booking_system.save_trips() now we want to save to db directly
-                try:
-                    db_sqlite.save_trip(conn, trip)
-                except Exception as e:
-                    print(Fore.RED + f"Can't persist trip to DB: {e}" + Style.RESET_ALL)
+                print(Fore.GREEN + "Trip booked successfully!" + Style.RESET_ALL)
 
         # --- Option 6: View My Trips ---
         elif choice == "6":
