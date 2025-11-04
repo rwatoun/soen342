@@ -1,31 +1,34 @@
-# SOEN 342 - II 
-# EU Rail Network
+# SOEN 342 (II) - EU Rail Network
 
-Team Members
+## Team Members
 | Full Name      | Username     | Student ID |
 | -------------- | ------------ | ---------- |
 | Marwa Hammani  | @rwatoun     | 40289362   |
 | Justyne Phan   | @JustynePhan | 40278509   |
 | Elif Sag Sesen | @elif5446    | 40283343   |
 
+
+## Requirements and Commands
+### Running the Program
 Must have Python installed.  
 Depending on your Python version, you might have to replace the python command with python3.  
 Colorama library (for colored CLI output).  
-
 
 After cloning the repository:  
 ```python -m venv .venv```  
 ```pip install -e .```  
 ```pip install colorama```  
-To **run** the program: ```python -m EURailNetwork data/eu_rail_network.csv```
+```python -m EURailNetwork data/eu_rail_network.csv```
 
 This will launch the interactive menu where you can view the network summary, search for connections, view city information, or view train details.  
 
+### Running the Tests
 To run **tests**: ```pytest -v```  
 
-To run **SQLite CLI** and interact with tables and data:  
+### Running and Using SQLite CLI  
 Open database: ```sqlite3 eurail.db```  
-View tables: ``` .tables```  
-View schema structure: ``` .schema TableName``` 
+View tables: ```.tables```  
+View schema structure: ```.schema TableName```   
+View info of all booked trips: ```SELECT t.id, tr.firstName, tr.lastName, tr.age, r.ticketId FROM Trip t JOIN Reservation r ON t.id = r.tripId JOIN Traveller tr ON r.travellerId = tr.id;``` 
 
 
