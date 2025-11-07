@@ -1,10 +1,15 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+import sqlite3
 from typing import Dict
+
 from .models import City, Train, Connection, Traveller, Trip, Reservation, Ticket
+
 from datetime import time
 import unicodedata
 from typing import Dict, List, Optional
+import random
+import string
 
 
 # this function helps normalize the data by trimming and collapsing spaces
@@ -356,12 +361,38 @@ class BookingSystem:
     railNetwork: RailNetwork
     travellers: Travellers = field(default_factory=Travellers)
     trips: Trips = field(default_factory=Trips)
+    db_connection: sqlite3.Connection = None
 
-    def book_trip(self, connection: Connection, traveller_data: list[dict]) -> Trip: # Also creates trip object
-        # Connection selected need to exist to be booked and to create a trip
-        if connection not in self.railNetwork.connections:
-            raise ValueError("Connection not found in rail network") # If there are no connections, stop here and raise error
+    # This is the method that will generate an alphanumeric ID for every trip
+    # Moved from models.py
+    @staticmethod
+    def generate_trip_id() -> str:
+        letters = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        return f"TRP-{letters}"
+
+    def book_trip(self, connections: Connection | list[Connection], traveller_data: list[dict]) -> Trip: # Also creates trip object
+        # convert single connections into list
+        if isinstance(connections, Connection):
+            connections = [connections]
+
+        # validate connection - Connection selected need to exist to be booked and to create a trip
+        for c in connections:
+            if c not in self.railNetwork.connections:
+                raise ValueError("Connection not found in rail network") # If there are no connections, stop here and raise error
         
+        # validate layover duration with a temporary trip id (trip layover needs to be validated before its id is generated)
+        t = Trip(id="temp")
+        t.connections.extend(connections)
+        if not t.validate_layover() and len(connections) > 1: # only for multi connection trips
+            raise ValueError("Trip doesn't satisfy our layover rules.")
+
+        # generate unique trip id
+        trip_id = self.generate_trip_id()
+
+        # create trip
+        trip = Trip(id=trip_id)
+        trip.connections.extend(connections)
+
         travellers = []
         for data in traveller_data:
             # Creates/Gets traveller for every traveller data provided
@@ -372,9 +403,6 @@ class BookingSystem:
                 id=data["id"]
             )
             travellers.append(traveller) # Add each traveller to list
-
-        trip = Trip()
-        trip.connections.append(connection)
 
         for traveller in travellers:
             ticket = Ticket(reservation=None)
@@ -389,6 +417,9 @@ class BookingSystem:
 
         self.trips.items.append(trip)
         self.trips.by_id[trip.id] = trip
+        
+        self.save_trip_to_db(trip=trip)
+        
         return trip
     
     def view_trips_given_traveller(self, traveller_last_name: str, traveller_id: str = None) -> list[Trip]:
@@ -449,6 +480,22 @@ class BookingSystem:
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
     
+    # saving created trip to db using function in dq_sqlite.py
+    def save_trip_to_db(self, trip: Trip, db_connection: sqlite3.Connection = None) -> None:
+        if db_connection is None:
+            print(f"Warning: No database connection found.")
+            return
+        
+        try:
+            from EURailNetwork.db_sqlite import save_trip
+            save_trip(db_connection, trip)
+            print(f"Trip {trip.id} successfully saved to database.")
+        except Exception as e:
+                print(f"Error: Could not save trip to database - {e}")
+                # debug
+                import traceback
+                traceback.print_exc()
+
     def load_trips(self, filepath: str = "trip_data.json") -> None:
         # Load trips and traveller data from JSON file.
         import json

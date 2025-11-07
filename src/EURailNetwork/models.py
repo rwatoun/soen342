@@ -36,20 +36,56 @@ class Connection:
     train: Train
     trip_minutes: int
 
-# This is the method that will generate an alphanumeric ID for every trip
-def generate_trip_id() -> str:
-    letters = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    return f"TRP-{letters}"
+# This is the method that will generate an alphanumeric ID for every trip (global)
+#def generate_trip_id() -> str:
+    #letters = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    #return f"TRP-{letters}"
 
 @dataclass
 class Trip:
-    id: str = field(default_factory=generate_trip_id)
+    id: str = "" # empty string until BookingSystem generates the id upon booking
     reservations: list["Reservation"] = field(default_factory=list)
     connections: list["Connection"] = field(default_factory=list)
 
-    # Adding reservation - no duplicate check to avoid circular comparison
+    def add_connection(self, connection: "Connection") -> None:
+        self.connections.append(connection)
+
+    # Add reservation - no duplicate check to avoid circular comparison
     def add_reservation(self, reservation: "Reservation") -> None:
         self.reservations.append(reservation)
+
+    # calculate layover
+    def _layover_min(self, next_dep:time, current_arr:time) -> int: # returns layover duration in minutes (int)
+        arr_min = (current_arr.hour * 60) + current_arr.minute
+        dep_min = (next_dep.hour * 60) + next_dep.minute
+        if dep_min >= arr_min:
+            # Same day
+            return dep_min - arr_min
+        else:
+            # Next day
+            return (1440 - arr_min) + dep_min
+
+    # Add layover rules #################################
+        # Daytime: No layovers of more than 2 hours
+        # Nighttime: No layovers of more than 30 minutes
+        # At any time of day: At least 10 min to walk to the right stop and prepare tickets and suitcases
+    def validate_layover(self) -> bool:
+        for i in range(len(self.connections)-1):
+            current_arr = self.connections[i].arr_time
+            next_dept = self.connections[i+1].dep_time
+
+            # calculate layover duration in min to make sure it respects layover rules
+            layover_duration = self._layover_min(next_dept, current_arr)
+
+            # daytime layover rule: 2 hours or less
+            if 6 <= next_dept.hour < 19: # daytime = between 6AM (incl) - 7PM (excl)
+                if not (10 <= layover_duration <= 120):
+                    return False
+            else: # nighttime = between 7PM (incl) - 6AM (excl)
+                if not (10 <= layover_duration <= 30):
+                    return False
+                
+        return True
 
 @dataclass
 class Traveller:
